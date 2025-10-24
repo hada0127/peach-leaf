@@ -4,6 +4,7 @@
   import MarkdownEditor from './MarkdownEditor.svelte';
   import MarkdownPreview from './MarkdownPreview.svelte';
   import Toolbar from './Toolbar.svelte';
+  import type { EditorView } from '@codemirror/view';
 
   interface Props {
     data: {
@@ -28,6 +29,7 @@
   let windowX = $state(0);
   let windowY = $state(0);
   let scaleFactor = $state(1);
+  let editorView: EditorView | null = null;
   let saveTimeout: number | null = null;
 
   async function loadFile() {
@@ -97,26 +99,20 @@
   }
 
   async function startDrag(e: MouseEvent) {
-    console.log('startDrag called, target:', e.target);
-
     // 버튼 클릭은 드래그로 처리하지 않음
     const isButton = (e.target as HTMLElement).closest('button');
     if (isButton) {
-      console.log('Button clicked, not dragging');
       return;
     }
 
     const toolbar = (e.target as HTMLElement).closest('.toolbar');
-    console.log('toolbar found:', toolbar);
     if (toolbar) {
-      console.log('Starting drag');
-
       // 현재 윈도우 위치 가져오기
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       const currentWindow = getCurrentWindow();
       const position = await currentWindow.outerPosition();
 
-      // macOS에서 물리적 픽셀과 논리적 픽셀이 다를 수 있음
+      // Retina 디스플레이를 위한 scale factor 가져오기
       scaleFactor = await currentWindow.scaleFactor();
       windowX = position.x;
       windowY = position.y;
@@ -124,32 +120,23 @@
       isDragging = true;
       dragStartX = e.screenX;
       dragStartY = e.screenY;
-      e.preventDefault(); // 기본 동작 방지
-
-      console.log('Scale factor:', scaleFactor, 'Initial position:', windowX, windowY);
+      e.preventDefault();
     }
   }
 
   function handleDrag(e: MouseEvent) {
     if (isDragging && e.screenX !== 0 && e.screenY !== 0) {
-      // screenX/screenY는 논리적 픽셀, PhysicalPosition은 물리적 픽셀을 기대
-      // scaleFactor를 곱해서 물리적 픽셀로 변환
+      // screenX/screenY는 논리적 픽셀이므로 scaleFactor를 곱해 물리적 픽셀로 변환
       const deltaX = (e.screenX - dragStartX) * scaleFactor;
       const deltaY = (e.screenY - dragStartY) * scaleFactor;
 
-      console.log('Mouse delta (logical):', e.screenX - dragStartX, e.screenY - dragStartY);
-      console.log('Mouse delta (physical):', deltaX, deltaY);
-
-      // 누적된 delta 값으로 새 위치 계산
       windowX += deltaX;
       windowY += deltaY;
 
       dragStartX = e.screenX;
       dragStartY = e.screenY;
 
-      console.log('Setting window to:', windowX, windowY);
-
-      // 비동기로 윈도우 위치 업데이트 (await 하지 않음)
+      // 비동기로 윈도우 위치 업데이트 (await 하지 않아 부드러운 드래그)
       updateWindowPosition(windowX, windowY);
     }
   }
@@ -170,12 +157,12 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    console.log('Key pressed:', e.key, 'metaKey:', e.metaKey, 'ctrlKey:', e.ctrlKey);
+    // Cmd+M: 모드 전환 - 다른 키는 모두 통과시킴
     if ((e.metaKey || e.ctrlKey) && e.key === 'm') {
-      console.log('Mode toggle shortcut detected!');
       e.preventDefault();
       toggleMode();
     }
+    // 다른 모든 키는 기본 동작 허용 (CodeMirror가 처리)
   }
 
   // 컬러 피커 열기
@@ -244,7 +231,7 @@
   }
 
   // 메뉴 이벤트 핸들러
-  function handleMenuEvent(menuId: string) {
+  async function handleMenuEvent(menuId: string) {
     console.log('Menu event received:', menuId);
 
     // New Note
@@ -258,6 +245,52 @@
     if (menuId === 'open_color_picker') {
       console.log('Handling open_color_picker');
       openColorPicker();
+      return;
+    }
+
+    // Edit 메뉴
+    if (menuId === 'undo' && editorView) {
+      const { undo } = await import('@codemirror/commands');
+      undo(editorView);
+      return;
+    }
+    if (menuId === 'redo' && editorView) {
+      const { redo } = await import('@codemirror/commands');
+      redo(editorView);
+      return;
+    }
+    if (menuId === 'cut' && editorView) {
+      const selection = editorView.state.selection.main;
+      if (!selection.empty) {
+        const text = editorView.state.sliceDoc(selection.from, selection.to);
+        const { writeText } = await import('@tauri-apps/plugin-clipboard-manager');
+        await writeText(text);
+        editorView.dispatch({
+          changes: { from: selection.from, to: selection.to, insert: '' }
+        });
+      }
+      return;
+    }
+    if (menuId === 'copy' && editorView) {
+      const selection = editorView.state.selection.main;
+      if (!selection.empty) {
+        const text = editorView.state.sliceDoc(selection.from, selection.to);
+        const { writeText } = await import('@tauri-apps/plugin-clipboard-manager');
+        await writeText(text);
+      }
+      return;
+    }
+    if (menuId === 'paste' && editorView) {
+      try {
+        const { readText } = await import('@tauri-apps/plugin-clipboard-manager');
+        const text = await readText();
+        const selection = editorView.state.selection.main;
+        editorView.dispatch({
+          changes: { from: selection.from, to: selection.to, insert: text }
+        });
+      } catch (error) {
+        console.error('Failed to paste:', error);
+      }
       return;
     }
 
@@ -324,8 +357,6 @@
   class="sticker"
   style="background-color: {backgroundColor}; color: {textColor};"
   onmousedown={startDrag}
-  role="application"
-  tabindex="0"
 >
   <Toolbar
     {mode}
@@ -337,7 +368,13 @@
   <div class="content" style="font-size: {fontSize}px;">
     {#key mode}
       {#if mode === 'edit'}
-        <MarkdownEditor {content} {textColor} {fontSize} onchange={handleContentChange} />
+        <MarkdownEditor
+          {content}
+          {textColor}
+          {fontSize}
+          onchange={handleContentChange}
+          oneditorready={(view) => { editorView = view; }}
+        />
       {:else}
         <MarkdownPreview {content} {textColor} {fontSize} />
       {/if}
@@ -351,7 +388,6 @@
     height: 100vh;
     display: flex;
     flex-direction: column;
-    border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     overflow: hidden;
   }
@@ -360,16 +396,5 @@
     flex: 1;
     overflow: auto;
     padding: 12px;
-  }
-
-  .mode-indicator {
-    background: #ff9800;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: bold;
-    margin-bottom: 8px;
-    display: inline-block;
   }
 </style>

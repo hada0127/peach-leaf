@@ -10,6 +10,8 @@
     "core:event:allow-listen",
     "core:event:allow-emit",
     "core:window:allow-set-position",
-    "core:window:allow-outer-position"
+    "core:window:allow-outer-position",
+    "clipboard-manager:allow-read-text",
+    "clipboard-manager:allow-write-text"
   ]
 }

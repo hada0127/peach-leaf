@@ -167,6 +167,7 @@ async fn apply_color(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_clipboard_manager::init())
         .invoke_handler(tauri::generate_handler![
             read_file,
             write_file,
@@ -225,12 +226,12 @@ fn create_menu(app: &tauri::App) -> Result<Menu<tauri::Wry>, tauri::Error> {
 
     // Edit Menu
     let edit_menu = SubmenuBuilder::new(app, "Edit")
-        .item(&MenuItemBuilder::new("Undo").id("undo").build(app)?)
-        .item(&MenuItemBuilder::new("Redo").id("redo").build(app)?)
+        .item(&MenuItemBuilder::new("Undo").id("undo").accelerator("CmdOrCtrl+Z").build(app)?)
+        .item(&MenuItemBuilder::new("Redo").id("redo").accelerator("CmdOrCtrl+Shift+Z").build(app)?)
         .separator()
-        .item(&MenuItemBuilder::new("Cut").id("cut").build(app)?)
-        .item(&MenuItemBuilder::new("Copy").id("copy").build(app)?)
-        .item(&MenuItemBuilder::new("Paste").id("paste").build(app)?)
+        .item(&MenuItemBuilder::new("Cut").id("cut").accelerator("CmdOrCtrl+X").build(app)?)
+        .item(&MenuItemBuilder::new("Copy").id("copy").accelerator("CmdOrCtrl+C").build(app)?)
+        .item(&MenuItemBuilder::new("Paste").id("paste").accelerator("CmdOrCtrl+V").build(app)?)
         .build()?;
 
     // Font Menu

@@ -12,9 +12,10 @@
     textColor: string;
     fontSize?: number;
     onchange?: (event: CustomEvent<string>) => void;
+    oneditorready?: (view: EditorView) => void;
   }
 
-  let { content, textColor, fontSize = 11, onchange }: Props = $props();
+  let { content, textColor, fontSize = 11, onchange, oneditorready }: Props = $props();
 
   let editorContainer = $state<HTMLDivElement>();
   let editorView: EditorView | null = null;
@@ -68,6 +69,11 @@
       state: startState,
       parent: editorContainer,
     });
+
+    // Notify parent that editor is ready
+    if (oneditorready) {
+      oneditorready(editorView);
+    }
 
     return () => {
       if (editorView) {
