@@ -35,6 +35,8 @@
   let dragStartY = $state(0);
   let initialWindowX = $state(0);
   let initialWindowY = $state(0);
+  let lastDragTime = 0;
+
 
   // Watch for props changes and update local state
   $effect(() => {
@@ -187,18 +189,19 @@
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       const currentWindow = getCurrentWindow();
       const position = await currentWindow.outerPosition();
-      const scaleFactor = await currentWindow.scaleFactor();
 
-      initialWindowX = position.x / scaleFactor;
-      initialWindowY = position.y / scaleFactor;
+      // Use physical coordinates directly
+      initialWindowX = position.x;
+      initialWindowY = position.y;
 
       isDragging = true;
       dragStartX = e.screenX;
       dragStartY = e.screenY;
+      lastDragTime = Date.now();
     }
   }
 
-  function handleDrag(e: MouseEvent) {
+  async function handleDrag(e: MouseEvent) {
     if (isDragging && e.screenX !== 0 && e.screenY !== 0) {
       const deltaX = e.screenX - dragStartX;
       const deltaY = e.screenY - dragStartY;
@@ -206,22 +209,24 @@
       const newX = initialWindowX + deltaX;
       const newY = initialWindowY + deltaY;
 
-      updateWindowPosition(newX, newY);
-    }
-  }
+      const { getCurrentWindow, PhysicalPosition } = await import('@tauri-apps/api/window');
+      const currentWindow = getCurrentWindow();
+      const newPosition = new PhysicalPosition(newX, newY);
+      await currentWindow.setPosition(newPosition);
 
-  async function updateWindowPosition(logicalX: number, logicalY: number) {
-    const { getCurrentWindow, LogicalPosition } = await import('@tauri-apps/api/window');
-    const currentWindow = getCurrentWindow();
-    const newPosition = new LogicalPosition(logicalX, logicalY);
-    await currentWindow.setPosition(newPosition);
+      lastDragTime = Date.now();
+    }
   }
 
   function stopDrag() {
     if (isDragging) {
       isDragging = false;
-      // Save window state after drag ends
-      saveWindowState();
+      // Debounced save - only save after drag has been idle for 100ms
+      setTimeout(() => {
+        if (!isDragging && Date.now() - lastDragTime > 100) {
+          saveWindowState();
+        }
+      }, 100);
     }
   }
 
@@ -508,10 +513,12 @@
       await saveWindowState();
     });
 
-    // Listen for window move events
+    // Listen for window move events - but don't save during drag
     unlistenMoved = await currentWindow.onMoved(async () => {
-      console.log(`[${data.id}] Window moved, saving state...`);
-      await saveWindowState();
+      if (!isDragging) {
+        console.log(`[${data.id}] Window moved, saving state...`);
+        await saveWindowState();
+      }
     });
   });
 
