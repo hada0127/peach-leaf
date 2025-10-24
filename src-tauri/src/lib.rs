@@ -1,5 +1,7 @@
 use tauri::{Emitter, Manager, menu::{Menu, MenuBuilder, SubmenuBuilder, MenuItemBuilder}};
 use std::fs;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -185,21 +187,49 @@ pub fn run() {
             let menu = create_menu(app)?;
             app.set_menu(menu)?;
 
-            // Handle menu events
+            // Handle menu events with debouncing
+            let last_menu_event: Arc<Mutex<Option<(String, Instant)>>> = Arc::new(Mutex::new(None));
+
             app.on_menu_event(move |app, event| {
                 let menu_id = event.id().as_ref();
+
+                // Debounce: ignore events within 300ms
+                {
+                    let mut last_event = last_menu_event.lock().unwrap();
+                    let now = Instant::now();
+
+                    if let Some((last_id, last_time)) = last_event.as_ref() {
+                        if last_id == menu_id && now.duration_since(*last_time) < Duration::from_millis(300) {
+                            println!("Ignoring duplicate menu event: {}", menu_id);
+                            return;
+                        }
+                    }
+
+                    *last_event = Some((menu_id.to_string(), now));
+                }
+
                 println!("Menu clicked: {}", menu_id);
 
-                // If new_note is clicked and there are no windows, create one
-                if menu_id == "new_note" && app.webview_windows().is_empty() {
-                    println!("No windows exist, creating main window");
-                    if let Err(e) = create_main_window(app) {
-                        eprintln!("Failed to create main window: {}", e);
+                // Handle new_note in backend to avoid duplicate creation
+                if menu_id == "new_note" {
+                    println!("Handling new_note in backend");
+                    create_new_note_backend(app);
+                    return;
+                }
+
+                // Handle close_note: emit ONLY to focused window
+                if menu_id == "close_note" {
+                    println!("Handling close_note in backend");
+                    if let Some(focused_window) = app.webview_windows().values().find(|w| {
+                        w.is_focused().unwrap_or(false)
+                    }) {
+                        println!("Emitting close_note to focused window: {}", focused_window.label());
+                        let _ = focused_window.emit(&format!("close_note_{}", focused_window.label()), ());
                     }
                     return;
                 }
 
-                // Emit event to the focused window
+                // Emit event to the focused window (for other menu items)
                 if let Some(focused_window) = app.webview_windows().values().find(|w| {
                     w.is_focused().unwrap_or(false)
                 }) {
@@ -238,8 +268,8 @@ fn create_menu(app: &tauri::App) -> Result<Menu<tauri::Wry>, tauri::Error> {
 
     // File Menu
     let file_menu = SubmenuBuilder::new(app, "File")
-        .item(&MenuItemBuilder::new("New Note").id("new_note").build(app)?)
-        .item(&MenuItemBuilder::new("Close Note").id("close_note").build(app)?)
+        .item(&MenuItemBuilder::new("New Note").id("new_note").accelerator("CmdOrCtrl+N").build(app)?)
+        .item(&MenuItemBuilder::new("Close Note").id("close_note").accelerator("CmdOrCtrl+W").build(app)?)
         .build()?;
 
     // Edit Menu
@@ -307,7 +337,7 @@ fn create_main_window(app: &tauri::AppHandle) -> Result<(), tauri::Error> {
     use tauri::WebviewWindowBuilder;
     use tauri::WebviewUrl;
 
-    let window = WebviewWindowBuilder::new(
+    let _window = WebviewWindowBuilder::new(
         app,
         "main",
         WebviewUrl::default(),
@@ -321,4 +351,72 @@ fn create_main_window(app: &tauri::AppHandle) -> Result<(), tauri::Error> {
     .build()?;
 
     Ok(())
+}
+
+fn create_new_note_backend(app: &tauri::AppHandle) {
+    use tauri::WebviewWindowBuilder;
+    use tauri::WebviewUrl;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    // If no windows exist, create main window
+    if app.webview_windows().is_empty() {
+        println!("No windows exist, creating main window");
+        if let Err(e) = create_main_window(app) {
+            eprintln!("Failed to create main window: {}", e);
+        }
+        return;
+    }
+
+    // Generate unique ID
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis();
+    let new_id = format!("note-{}", timestamp);
+    let temp_file_path = format!("/tmp/{}.md", new_id);
+
+    // Random offset for window position
+    let random_offset = (timestamp % 100) as i32 + 50;
+
+    // Create sticker data
+    let sticker_data = StickerData {
+        id: new_id.clone(),
+        file_path: temp_file_path.clone(),
+        x: 150 + random_offset,
+        y: 150 + random_offset,
+        width: 400,
+        height: 300,
+        background_color: "#FEFCE8".to_string(),
+        text_color: "#333333".to_string(),
+        mode: "edit".to_string(),
+    };
+
+    // Write empty file
+    if let Err(e) = fs::write(&temp_file_path, "# New Note\n\n") {
+        eprintln!("Failed to create file: {}", e);
+        return;
+    }
+
+    // Create window
+    match WebviewWindowBuilder::new(
+        app,
+        &new_id,
+        WebviewUrl::default(),
+    )
+    .title("PeachLeaf")
+    .inner_size(400.0, 300.0)
+    .position((150 + random_offset) as f64, (150 + random_offset) as f64)
+    .decorations(false)
+    .resizable(true)
+    .build() {
+        Ok(window) => {
+            // Send sticker data to the window
+            if let Err(e) = window.emit("init-sticker", sticker_data) {
+                eprintln!("Failed to emit init-sticker: {}", e);
+            }
+        }
+        Err(e) => {
+            eprintln!("Failed to create window: {}", e);
+        }
+    }
 }

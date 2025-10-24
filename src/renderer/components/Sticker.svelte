@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { listen } from '@tauri-apps/api/event';
   import MarkdownEditor from './MarkdownEditor.svelte';
   import MarkdownPreview from './MarkdownPreview.svelte';
@@ -31,6 +31,9 @@
   let scaleFactor = $state(1);
   let editorView: EditorView | null = null;
   let saveTimeout: number | null = null;
+  let lastMenuEventTime = 0;
+  let isProcessingMenuEvent = false;
+  let pressedKeys = new Set<string>();
 
   async function loadFile() {
     if (!window.electron) {
@@ -92,11 +95,28 @@
 
   async function handleClose() {
     try {
+      console.log(`[${data.id}] handleClose called`);
+
       // Check if there's content in the note
       const trimmedContent = content.trim();
 
-      // If there's content, show confirmation dialog
-      if (trimmedContent.length > 0) {
+      console.log(`[${data.id}] trimmedContent:`, JSON.stringify(trimmedContent));
+      console.log(`[${data.id}] content length:`, trimmedContent.length);
+
+      // Ignore default content "# New Note" or empty content
+      // Check various formats of default content
+      const isDefaultContent = trimmedContent === '' ||
+                               trimmedContent === '# New Note' ||
+                               trimmedContent === '#NewNote' ||
+                               trimmedContent === '# New Note\n' ||
+                               trimmedContent === '# New Note\n\n';
+
+      const hasRealContent = trimmedContent.length > 0 && !isDefaultContent;
+
+      console.log(`[${data.id}] hasRealContent:`, hasRealContent);
+
+      // If there's real content, show confirmation dialog
+      if (hasRealContent) {
         const { confirm } = await import('@tauri-apps/plugin-dialog');
         const shouldClose = await confirm('This note has content. Are you sure you want to close it?', {
           title: 'Close Note',
@@ -176,12 +196,38 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    // Cmd+M: 모드 전환 - 다른 키는 모두 통과시킴
+    // 키를 누르고 있는 동안 중복 실행 방지
+    const keyCombo = `${e.metaKey || e.ctrlKey ? 'cmd-' : ''}${e.key.toLowerCase()}`;
+
+    // 이미 눌려있는 키면 무시 (키 반복 방지)
+    if (pressedKeys.has(keyCombo)) {
+      e.preventDefault();
+      return;
+    }
+
+    pressedKeys.add(keyCombo);
+
+    // Cmd+M: 모드 전환 - 이것만 preventDefault
     if ((e.metaKey || e.ctrlKey) && e.key === 'm') {
       e.preventDefault();
-      toggleMode();
     }
+    // Cmd+N, Cmd+W, Cmd+Q는 메뉴 시스템이 처리하도록 그냥 통과
     // 다른 모든 키는 기본 동작 허용 (CodeMirror가 처리)
+  }
+
+  function handleKeyup(e: KeyboardEvent) {
+    const keyCombo = `${e.metaKey || e.ctrlKey ? 'cmd-' : ''}${e.key.toLowerCase()}`;
+
+    // 키를 뗐을 때 실행
+    if (pressedKeys.has(keyCombo)) {
+      pressedKeys.delete(keyCombo);
+
+      // Cmd+M: 모드 전환
+      if ((e.metaKey || e.ctrlKey) && e.key === 'm') {
+        e.preventDefault();
+        toggleMode();
+      }
+    }
   }
 
   // 컬러 피커 열기
@@ -253,113 +299,134 @@
   async function handleMenuEvent(menuId: string) {
     console.log('Menu event received:', menuId);
 
-    // New Note
-    if (menuId === 'new_note') {
-      console.log('Handling new_note');
-      createNewNote();
+    // Debounce: 300ms 이내의 중복 이벤트 무시
+    const now = Date.now();
+    if (now - lastMenuEventTime < 300) {
+      console.log('Ignoring duplicate menu event');
       return;
     }
+    lastMenuEventTime = now;
 
-    // Color Picker 열기
-    if (menuId === 'open_color_picker') {
-      console.log('Handling open_color_picker');
-      openColorPicker();
+    // 이미 처리 중인 경우 무시
+    if (isProcessingMenuEvent) {
+      console.log('Already processing menu event');
       return;
     }
+    isProcessingMenuEvent = true;
 
-    // Edit 메뉴
-    if (menuId === 'undo' && editorView) {
-      const { undo } = await import('@codemirror/commands');
-      undo(editorView);
-      return;
-    }
-    if (menuId === 'redo' && editorView) {
-      const { redo } = await import('@codemirror/commands');
-      redo(editorView);
-      return;
-    }
-    if (menuId === 'cut' && editorView) {
-      const selection = editorView.state.selection.main;
-      if (!selection.empty) {
-        const text = editorView.state.sliceDoc(selection.from, selection.to);
-        const { writeText } = await import('@tauri-apps/plugin-clipboard-manager');
-        await writeText(text);
-        editorView.dispatch({
-          changes: { from: selection.from, to: selection.to, insert: '' }
-        });
+    try {
+      // New Note is now handled in backend, skip here
+      if (menuId === 'new_note') {
+        console.log('new_note handled in backend, skipping frontend');
+        return;
       }
-      return;
-    }
-    if (menuId === 'copy' && editorView) {
-      const selection = editorView.state.selection.main;
-      if (!selection.empty) {
-        const text = editorView.state.sliceDoc(selection.from, selection.to);
-        const { writeText } = await import('@tauri-apps/plugin-clipboard-manager');
-        await writeText(text);
+
+      // Color Picker 열기
+      if (menuId === 'open_color_picker') {
+        console.log('Handling open_color_picker');
+        await openColorPicker();
+        return;
       }
-      return;
-    }
-    if (menuId === 'paste' && editorView) {
-      try {
-        const { readText } = await import('@tauri-apps/plugin-clipboard-manager');
-        const text = await readText();
+
+      // Edit 메뉴
+      if (menuId === 'undo' && editorView) {
+        const { undo } = await import('@codemirror/commands');
+        undo(editorView);
+        return;
+      }
+      if (menuId === 'redo' && editorView) {
+        const { redo } = await import('@codemirror/commands');
+        redo(editorView);
+        return;
+      }
+      if (menuId === 'cut' && editorView) {
         const selection = editorView.state.selection.main;
-        const from = selection.from;
-        const to = selection.to;
-        const insertLength = text.length;
-
-        editorView.dispatch({
-          changes: { from, to, insert: text },
-          selection: { anchor: from + insertLength }
-        });
-      } catch (error) {
-        console.error('Failed to paste:', error);
+        if (!selection.empty) {
+          const text = editorView.state.sliceDoc(selection.from, selection.to);
+          const { writeText } = await import('@tauri-apps/plugin-clipboard-manager');
+          await writeText(text);
+          editorView.dispatch({
+            changes: { from: selection.from, to: selection.to, insert: '' }
+          });
+        }
+        return;
       }
-      return;
-    }
+      if (menuId === 'copy' && editorView) {
+        const selection = editorView.state.selection.main;
+        if (!selection.empty) {
+          const text = editorView.state.sliceDoc(selection.from, selection.to);
+          const { writeText } = await import('@tauri-apps/plugin-clipboard-manager');
+          await writeText(text);
+        }
+        return;
+      }
+      if (menuId === 'paste' && editorView) {
+        try {
+          const { readText } = await import('@tauri-apps/plugin-clipboard-manager');
+          const text = await readText();
+          const selection = editorView.state.selection.main;
+          const from = selection.from;
+          const to = selection.to;
+          const insertLength = text.length;
 
-    // Font size
-    if (menuId === 'font_small') {
-      fontSize = 12;
-    }
-    else if (menuId === 'font_medium') {
-      fontSize = 14;
-    }
-    else if (menuId === 'font_large') {
-      fontSize = 16;
-    }
-    else if (menuId === 'font_xlarge') {
-      fontSize = 18;
-    }
-    else if (menuId === 'font_default') {
-      fontSize = 11;
-    }
-    // Window
-    else if (menuId === 'minimize') {
-      console.log('Minimize window');
-    }
-    else if (menuId === 'zoom') {
-      console.log('Zoom window');
-    }
-    // Close
-    else if (menuId === 'close_note') {
-      handleClose();
+          editorView.dispatch({
+            changes: { from, to, insert: text },
+            selection: { anchor: from + insertLength }
+          });
+        } catch (error) {
+          console.error('Failed to paste:', error);
+        }
+        return;
+      }
+
+      // Font size
+      if (menuId === 'font_small') {
+        fontSize = 12;
+      }
+      else if (menuId === 'font_medium') {
+        fontSize = 14;
+      }
+      else if (menuId === 'font_large') {
+        fontSize = 16;
+      }
+      else if (menuId === 'font_xlarge') {
+        fontSize = 18;
+      }
+      else if (menuId === 'font_default') {
+        fontSize = 11;
+      }
+      // Window
+      else if (menuId === 'minimize') {
+        console.log('Minimize window');
+      }
+      else if (menuId === 'zoom') {
+        console.log('Zoom window');
+      }
+      // Close note is now handled in backend via window-specific event
+    } finally {
+      // 처리 완료 후 플래그 리셋
+      isProcessingMenuEvent = false;
     }
   }
+
+  let unlistenMenu: (() => void) | null = null;
+  let unlistenColorSelected: (() => void) | null = null;
+  let unlistenCloseNote: (() => void) | null = null;
 
   onMount(async () => {
     loadFile();
     document.addEventListener('mousemove', handleDrag);
     document.addEventListener('mouseup', stopDrag);
     window.addEventListener('keydown', handleKeydown);
+    window.addEventListener('keyup', handleKeyup);
 
     // Tauri 메뉴 이벤트 리스닝
-    const unlistenMenu = listen('menu', (event) => {
+    unlistenMenu = await listen('menu', (event) => {
       handleMenuEvent(event.payload as string);
     });
 
     // 컬러 선택 이벤트 리스닝
-    const unlistenColorSelected = listen('color-selected', (event: any) => {
+    unlistenColorSelected = await listen('color-selected', (event: any) => {
       const data = event.payload;
       console.log('Color event received:', data);
 
@@ -367,13 +434,27 @@
       console.log('Color applied:', data.color);
     });
 
-    return () => {
-      document.removeEventListener('mousemove', handleDrag);
-      document.removeEventListener('mouseup', stopDrag);
-      window.removeEventListener('keydown', handleKeydown);
-      unlistenMenu.then(fn => fn());
-      unlistenColorSelected.then(fn => fn());
-    };
+    // 윈도우별 close_note 이벤트 리스닝
+    const { getCurrentWindow } = await import('@tauri-apps/api/window');
+    const currentWindow = getCurrentWindow();
+    const windowLabel = currentWindow.label;
+
+    console.log(`[${data.id}] Listening for close_note_${windowLabel}`);
+
+    unlistenCloseNote = await listen(`close_note_${windowLabel}`, () => {
+      console.log(`[${data.id}] Received close_note event for this window`);
+      handleClose();
+    });
+  });
+
+  onDestroy(() => {
+    document.removeEventListener('mousemove', handleDrag);
+    document.removeEventListener('mouseup', stopDrag);
+    window.removeEventListener('keydown', handleKeydown);
+    window.removeEventListener('keyup', handleKeyup);
+    if (unlistenMenu) unlistenMenu();
+    if (unlistenColorSelected) unlistenColorSelected();
+    if (unlistenCloseNote) unlistenCloseNote();
   });
 </script>
 
