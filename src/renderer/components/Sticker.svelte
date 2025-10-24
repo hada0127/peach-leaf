@@ -182,28 +182,38 @@
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       const currentWindow = getCurrentWindow();
       const position = await currentWindow.outerPosition();
+      const scaleFactor = await currentWindow.scaleFactor();
 
-      // Use physical coordinates directly
+      // Store initial position in physical pixels
       initialWindowX = position.x;
       initialWindowY = position.y;
 
+      // Store initial mouse position (screenX/Y are in logical pixels, convert to physical)
       isDragging = true;
-      dragStartX = e.screenX;
-      dragStartY = e.screenY;
+      dragStartX = e.screenX * scaleFactor;
+      dragStartY = e.screenY * scaleFactor;
       lastDragTime = Date.now();
     }
   }
 
   async function handleDrag(e: MouseEvent) {
     if (isDragging && e.screenX !== 0 && e.screenY !== 0) {
-      const deltaX = e.screenX - dragStartX;
-      const deltaY = e.screenY - dragStartY;
+      const { getCurrentWindow, PhysicalPosition } = await import('@tauri-apps/api/window');
+      const currentWindow = getCurrentWindow();
+      const scaleFactor = await currentWindow.scaleFactor();
 
+      // Convert logical pixels to physical pixels
+      const currentMouseX = e.screenX * scaleFactor;
+      const currentMouseY = e.screenY * scaleFactor;
+
+      // Calculate delta in physical pixels
+      const deltaX = currentMouseX - dragStartX;
+      const deltaY = currentMouseY - dragStartY;
+
+      // Calculate new position in physical pixels
       const newX = initialWindowX + deltaX;
       const newY = initialWindowY + deltaY;
 
-      const { getCurrentWindow, PhysicalPosition } = await import('@tauri-apps/api/window');
-      const currentWindow = getCurrentWindow();
       const newPosition = new PhysicalPosition(newX, newY);
       await currentWindow.setPosition(newPosition);
 
