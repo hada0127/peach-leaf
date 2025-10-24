@@ -16,6 +16,12 @@ struct StickerData {
     background_color: String,
     text_color: String,
     mode: String,
+    #[serde(default)]
+    monitor_name: Option<String>,
+    #[serde(default)]
+    monitor_position: Option<(i32, i32)>,
+    #[serde(default)]
+    monitor_size: Option<(u32, u32)>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -197,6 +203,21 @@ async fn save_window_state(app: tauri::AppHandle) -> Result<(), String> {
             .map(|data| data.mode.clone())
             .unwrap_or_else(|| "edit".to_string());
 
+        // Get monitor information
+        let (monitor_name, monitor_position, monitor_size) = match window.current_monitor() {
+            Ok(Some(monitor)) => {
+                let name = monitor.name().map(|s| s.to_string());
+                let pos = monitor.position();
+                let size = monitor.size();
+                (
+                    name,
+                    Some((pos.x, pos.y)),
+                    Some((size.width, size.height))
+                )
+            }
+            _ => (None, None, None)
+        };
+
         // Create file path for this window using permanent directory
         let notes_dir = get_notes_dir();
         let file_path = notes_dir.join(format!("{}.md", label));
@@ -219,6 +240,9 @@ async fn save_window_state(app: tauri::AppHandle) -> Result<(), String> {
             background_color: background_color.clone(),
             text_color: "#333333".to_string(),
             mode: mode.clone(),
+            monitor_name: monitor_name.clone(),
+            monitor_position,
+            monitor_size,
         };
 
         windows_data.push(sticker_data);
@@ -289,6 +313,9 @@ async fn update_window_metadata(
             background_color: background_color.unwrap_or_else(|| "#FEFCE8".to_string()),
             text_color: "#333333".to_string(),
             mode: mode.unwrap_or_else(|| "edit".to_string()),
+            monitor_name: None,
+            monitor_position: None,
+            monitor_size: None,
         });
     }
 
@@ -337,6 +364,21 @@ fn save_window_state_sync(app: &tauri::AppHandle) -> Result<(), String> {
             .map(|data| data.mode.clone())
             .unwrap_or_else(|| "edit".to_string());
 
+        // Get monitor information
+        let (monitor_name, monitor_position, monitor_size) = match window.current_monitor() {
+            Ok(Some(monitor)) => {
+                let name = monitor.name().map(|s| s.to_string());
+                let pos = monitor.position();
+                let size = monitor.size();
+                (
+                    name,
+                    Some((pos.x, pos.y)),
+                    Some((size.width, size.height))
+                )
+            }
+            _ => (None, None, None)
+        };
+
         // Create file path for this window using permanent directory
         let notes_dir = get_notes_dir();
         let file_path = notes_dir.join(format!("{}.md", label));
@@ -352,6 +394,9 @@ fn save_window_state_sync(app: &tauri::AppHandle) -> Result<(), String> {
             background_color: background_color.clone(),
             text_color: "#333333".to_string(),
             mode: mode.clone(),
+            monitor_name: monitor_name.clone(),
+            monitor_position,
+            monitor_size,
         };
 
         // Debug: check if metadata exists for this window
@@ -778,6 +823,46 @@ fn restore_window(app: &tauri::AppHandle, sticker_data: StickerData) {
 
     println!("Restoring window: {} at ({}, {})", sticker_data.id, sticker_data.x, sticker_data.y);
 
+    // Calculate absolute position based on saved monitor info
+    let (abs_x, abs_y) = if let (Some(saved_monitor_pos), Some(saved_monitor_size)) =
+        (sticker_data.monitor_position, sticker_data.monitor_size) {
+
+        println!("Saved monitor info: name={:?}, pos=({}, {}), size=({}, {})",
+                 sticker_data.monitor_name, saved_monitor_pos.0, saved_monitor_pos.1,
+                 saved_monitor_size.0, saved_monitor_size.1);
+
+        // Try to find a matching monitor
+        let available_monitors = app.available_monitors().unwrap_or_default();
+        let target_monitor = available_monitors.iter().find(|m| {
+            // First try to match by name if available
+            if let Some(ref saved_name) = sticker_data.monitor_name {
+                if let Some(current_name) = m.name() {
+                    if current_name == saved_name {
+                        return true;
+                    }
+                }
+            }
+            // Then try to match by position and size
+            let pos = m.position();
+            let size = m.size();
+            pos.x == saved_monitor_pos.0 && pos.y == saved_monitor_pos.1 &&
+            size.width == saved_monitor_size.0 && size.height == saved_monitor_size.1
+        });
+
+        if let Some(monitor) = target_monitor {
+            let monitor_pos = monitor.position();
+            println!("Found matching monitor at ({}, {})", monitor_pos.x, monitor_pos.y);
+            // Use absolute position (monitor position + relative window position)
+            (sticker_data.x, sticker_data.y)
+        } else {
+            println!("No matching monitor found, using saved position as-is");
+            (sticker_data.x, sticker_data.y)
+        }
+    } else {
+        println!("No monitor info saved, using position as-is");
+        (sticker_data.x, sticker_data.y)
+    };
+
     // Populate WINDOW_METADATA with the restored window's data
     {
         let mut metadata = WINDOW_METADATA.lock().unwrap();
@@ -792,7 +877,7 @@ fn restore_window(app: &tauri::AppHandle, sticker_data: StickerData) {
     )
     .title("PeachLeaf")
     .inner_size(sticker_data.width as f64, sticker_data.height as f64)
-    .position(sticker_data.x as f64, sticker_data.y as f64)
+    .position(abs_x as f64, abs_y as f64)
     .decorations(false)
     .resizable(true)
     .transparent(true)
@@ -857,6 +942,9 @@ fn create_new_note_backend(app: &tauri::AppHandle) {
         background_color: "#FEFCE8".to_string(),
         text_color: "#333333".to_string(),
         mode: "edit".to_string(),
+        monitor_name: None,
+        monitor_position: None,
+        monitor_size: None,
     };
 
     // Write empty file
