@@ -124,13 +124,11 @@
       console.log('Moving by:', deltaX, deltaY);
 
       // Tauri API 사용
-      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      const { getCurrentWindow, PhysicalPosition } = await import('@tauri-apps/api/window');
       const currentWindow = getCurrentWindow();
       const position = await currentWindow.outerPosition();
-      await currentWindow.setPosition({
-        x: position.x + deltaX,
-        y: position.y + deltaY
-      });
+      const newPosition = new PhysicalPosition(position.x + deltaX, position.y + deltaY);
+      await currentWindow.setPosition(newPosition);
     }
   }
 
