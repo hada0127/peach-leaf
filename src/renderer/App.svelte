@@ -2,6 +2,7 @@
   /// <reference types="svelte" />
   import { onMount } from 'svelte';
   import { getCurrentWindow } from '@tauri-apps/api/window';
+  import { listen } from '@tauri-apps/api/event';
   import Sticker from './components/Sticker.svelte';
   import ColorPicker from './components/ColorPicker.svelte';
   import type { StickerData } from './lib/tauri';
@@ -23,12 +24,45 @@
     mode: 'edit'
   });
 
-  onMount(() => {
+  onMount(async () => {
     const currentWindow = getCurrentWindow();
     windowLabel = currentWindow.label;
     isColorPicker = windowLabel === 'color-picker';
-    isInitialized = true;
+
     console.log('App.svelte mounted. Window label:', windowLabel, 'isColorPicker:', isColorPicker);
+
+    // Listen for init-sticker event to restore saved window data (BEFORE setting isInitialized)
+    if (!isColorPicker) {
+      await listen('init-sticker', (event: any) => {
+        const data = event.payload;
+        console.log('[App.svelte] Received init-sticker event:', data);
+
+        stickerData = {
+          id: data.id,
+          filePath: data.file_path,
+          x: data.x,
+          y: data.y,
+          width: data.width,
+          height: data.height,
+          backgroundColor: data.background_color,
+          textColor: data.text_color,
+          mode: data.mode
+        };
+
+        console.log('[App.svelte] Updated stickerData:', stickerData);
+      });
+
+      // For new windows (not restored), update the filePath to use permanent directory
+      if (stickerData.filePath.startsWith('/tmp/')) {
+        const timestamp = Date.now();
+        const newId = windowLabel === 'main' ? 'main' : `note-${timestamp}`;
+        stickerData.filePath = `/Users/tarucy/.peach-leaf/notes/${newId}.md`;
+        stickerData.id = newId;
+        console.log('[App.svelte] Updated new window file path to:', stickerData.filePath);
+      }
+    }
+
+    isInitialized = true;
   });
 </script>
 

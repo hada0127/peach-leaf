@@ -3,6 +3,7 @@ use std::fs;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct StickerData {
@@ -15,6 +16,55 @@ struct StickerData {
     background_color: String,
     text_color: String,
     mode: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct AppState {
+    windows: Vec<StickerData>,
+}
+
+fn get_state_file_path() -> PathBuf {
+    let home_dir = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    PathBuf::from(home_dir).join(".peach-leaf").join("state.json")
+}
+
+fn get_notes_dir() -> PathBuf {
+    let home_dir = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    PathBuf::from(home_dir).join(".peach-leaf").join("notes")
+}
+
+fn ensure_notes_dir() -> Result<PathBuf, String> {
+    let notes_dir = get_notes_dir();
+    fs::create_dir_all(&notes_dir).map_err(|e| e.to_string())?;
+    Ok(notes_dir)
+}
+
+fn save_app_state(windows: Vec<StickerData>) -> Result<(), String> {
+    let state = AppState { windows };
+    let json = serde_json::to_string_pretty(&state).map_err(|e| e.to_string())?;
+    let state_path = get_state_file_path();
+
+    // Ensure .peach-leaf directory exists
+    if let Some(parent) = state_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    fs::write(&state_path, json).map_err(|e| e.to_string())?;
+    println!("App state saved to: {:?}", state_path);
+    Ok(())
+}
+
+fn load_app_state() -> Result<AppState, String> {
+    let state_path = get_state_file_path();
+    if !state_path.exists() {
+        println!("No saved state found");
+        return Ok(AppState { windows: vec![] });
+    }
+
+    let json = fs::read_to_string(&state_path).map_err(|e| e.to_string())?;
+    let state: AppState = serde_json::from_str(&json).map_err(|e| e.to_string())?;
+    println!("App state loaded from: {:?}", state_path);
+    Ok(state)
 }
 
 #[tauri::command]
@@ -34,6 +84,150 @@ async fn select_file(_app: tauri::AppHandle) -> Result<Option<String>, String> {
     // For now, return None - file dialog will be added later
     // In Tauri 2.x, file dialog is a separate plugin
     Ok(None)
+}
+
+#[tauri::command]
+async fn save_window_state(app: tauri::AppHandle) -> Result<(), String> {
+    println!("Saving window state...");
+    let mut windows_data = Vec::new();
+
+    for (label, window) in app.webview_windows().iter() {
+        // Skip color picker window
+        if label.as_str() == "color-picker" {
+            continue;
+        }
+
+        // Get window position and size
+        let position = window.outer_position().map_err(|e| e.to_string())?;
+        let size = window.outer_size().map_err(|e| e.to_string())?;
+
+        // Get window scale factor
+        let scale_factor = window.scale_factor().map_err(|e| e.to_string())?;
+
+        // Convert to logical pixels
+        let x = (position.x as f64 / scale_factor) as i32;
+        let y = (position.y as f64 / scale_factor) as i32;
+        let width = (size.width as f64 / scale_factor) as u32;
+        let height = (size.height as f64 / scale_factor) as u32;
+
+        // Create file path for this window
+        let file_path = format!("/tmp/{}.md", label);
+
+        let sticker_data = StickerData {
+            id: label.to_string(),
+            file_path,
+            x,
+            y,
+            width,
+            height,
+            background_color: "#FEFCE8".to_string(), // Default color, will be updated by frontend
+            text_color: "#333333".to_string(),
+            mode: "edit".to_string(),
+        };
+
+        windows_data.push(sticker_data);
+        println!("Saved window {}: position=({}, {}), size=({}x{})", label, x, y, width, height);
+    }
+
+    save_app_state(windows_data)?;
+    println!("Window state saved successfully");
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_saved_state() -> Result<AppState, String> {
+    load_app_state()
+}
+
+// Store for window metadata (background colors, etc.)
+use std::collections::HashMap;
+static WINDOW_METADATA: once_cell::sync::Lazy<Arc<Mutex<HashMap<String, StickerData>>>> =
+    once_cell::sync::Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
+
+#[tauri::command]
+async fn update_window_metadata(window_label: String, background_color: String) -> Result<(), String> {
+    let mut metadata = WINDOW_METADATA.lock().unwrap();
+
+    if let Some(data) = metadata.get_mut(&window_label) {
+        data.background_color = background_color;
+    } else {
+        // If metadata doesn't exist yet, create it with minimal info
+        let notes_dir = ensure_notes_dir()?;
+        let file_path = notes_dir.join(format!("{}.md", window_label));
+
+        metadata.insert(window_label.clone(), StickerData {
+            id: window_label,
+            file_path: file_path.to_string_lossy().to_string(),
+            x: 0,
+            y: 0,
+            width: 400,
+            height: 300,
+            background_color,
+            text_color: "#333333".to_string(),
+            mode: "edit".to_string(),
+        });
+    }
+
+    Ok(())
+}
+
+fn save_window_state_sync(app: &tauri::AppHandle) -> Result<(), String> {
+    println!("Saving window state (sync)...");
+    let mut windows_data = Vec::new();
+
+    // Get metadata
+    let metadata = WINDOW_METADATA.lock().unwrap();
+
+    for (label, window) in app.webview_windows().iter() {
+        // Skip color picker window
+        if label.as_str() == "color-picker" {
+            continue;
+        }
+
+        // Get window position and size
+        let position = window.outer_position().map_err(|e| e.to_string())?;
+        let size = window.outer_size().map_err(|e| e.to_string())?;
+
+        // Get window scale factor
+        let scale_factor = window.scale_factor().map_err(|e| e.to_string())?;
+
+        // Convert to logical pixels
+        let x = (position.x as f64 / scale_factor) as i32;
+        let y = (position.y as f64 / scale_factor) as i32;
+        let width = (size.width as f64 / scale_factor) as u32;
+        let height = (size.height as f64 / scale_factor) as u32;
+
+        // Get background color from metadata, or use default
+        let background_color = metadata
+            .get(label.as_str())
+            .map(|data| data.background_color.clone())
+            .unwrap_or_else(|| "#FEFCE8".to_string());
+
+        // Create file path for this window using permanent directory
+        let notes_dir = get_notes_dir();
+        let file_path = notes_dir.join(format!("{}.md", label));
+        let file_path_str = file_path.to_string_lossy().to_string();
+
+        let sticker_data = StickerData {
+            id: label.to_string(),
+            file_path: file_path_str.clone(),
+            x,
+            y,
+            width,
+            height,
+            background_color: background_color.clone(),
+            text_color: "#333333".to_string(),
+            mode: "edit".to_string(),
+        };
+
+        windows_data.push(sticker_data);
+        println!("Saved window {}: position=({}, {}), size=({}x{}), color={}, path={}",
+                 label, x, y, width, height, background_color, file_path_str);
+    }
+
+    save_app_state(windows_data)?;
+    println!("Window state saved successfully (sync)");
+    Ok(())
 }
 
 #[tauri::command]
@@ -181,12 +375,39 @@ pub fn run() {
             create_sticker_window,
             open_color_picker,
             close_color_picker,
-            apply_color
+            apply_color,
+            save_window_state,
+            get_saved_state,
+            update_window_metadata
         ])
         .setup(|app| {
             // Create menu
             let menu = create_menu(app)?;
             app.set_menu(menu)?;
+
+            // Restore saved windows
+            let app_handle = app.app_handle();
+            match load_app_state() {
+                Ok(state) => {
+                    if state.windows.is_empty() {
+                        println!("No saved windows, creating default window");
+                        if let Err(e) = create_main_window(&app_handle) {
+                            eprintln!("Failed to create main window: {}", e);
+                        }
+                    } else {
+                        println!("Restoring {} saved windows", state.windows.len());
+                        for window_data in state.windows {
+                            restore_window(&app_handle, window_data);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Failed to load saved state: {}", e);
+                    if let Err(e) = create_main_window(&app_handle) {
+                        eprintln!("Failed to create main window: {}", e);
+                    }
+                }
+            }
 
             // Handle menu events with debouncing
             let last_menu_event: Arc<Mutex<Option<(String, Instant)>>> = Arc::new(Mutex::new(None));
@@ -210,6 +431,25 @@ pub fn run() {
                 }
 
                 println!("Menu clicked: {}", menu_id);
+
+                // Handle quit_app: save state and quit
+                if menu_id == "quit_app" {
+                    println!("Handling quit_app in backend");
+                    if let Err(e) = save_window_state_sync(app) {
+                        eprintln!("Failed to save window state: {}", e);
+                    }
+
+                    // Close all windows
+                    let windows: Vec<_> = app.webview_windows().keys().map(|k| k.to_string()).collect();
+                    for label in windows {
+                        if let Some(window) = app.get_webview_window(&label) {
+                            let _ = window.close();
+                        }
+                    }
+
+                    // Exit the app
+                    std::process::exit(0);
+                }
 
                 // Handle new_note in backend to avoid duplicate creation
                 if menu_id == "new_note" {
@@ -279,7 +519,7 @@ fn create_menu(app: &tauri::App) -> Result<Menu<tauri::Wry>, tauri::Error> {
     #[cfg(target_os = "macos")]
     let app_menu = SubmenuBuilder::new(app, "PeachLeaf")
         .item(&PredefinedMenuItem::hide(app, None)?)
-        .item(&PredefinedMenuItem::quit(app, None)?)
+        .item(&MenuItemBuilder::new("Quit PeachLeaf").id("quit_app").accelerator("CmdOrCtrl+Q").build(app)?)
         .build()?;
 
     // File Menu
@@ -369,6 +609,38 @@ fn create_main_window(app: &tauri::AppHandle) -> Result<(), tauri::Error> {
     Ok(())
 }
 
+fn restore_window(app: &tauri::AppHandle, sticker_data: StickerData) {
+    use tauri::WebviewWindowBuilder;
+    use tauri::WebviewUrl;
+
+    println!("Restoring window: {} at ({}, {})", sticker_data.id, sticker_data.x, sticker_data.y);
+
+    match WebviewWindowBuilder::new(
+        app,
+        &sticker_data.id,
+        WebviewUrl::default(),
+    )
+    .title("PeachLeaf")
+    .inner_size(sticker_data.width as f64, sticker_data.height as f64)
+    .position(sticker_data.x as f64, sticker_data.y as f64)
+    .decorations(false)
+    .resizable(true)
+    .transparent(true)
+    .always_on_top(false)
+    .build() {
+        Ok(window) => {
+            // Send sticker data to the window after it's created
+            if let Err(e) = window.emit("init-sticker", &sticker_data) {
+                eprintln!("Failed to emit init-sticker event: {}", e);
+            }
+            println!("Window {} restored successfully", sticker_data.id);
+        }
+        Err(e) => {
+            eprintln!("Failed to restore window {}: {}", sticker_data.id, e);
+        }
+    }
+}
+
 fn create_new_note_backend(app: &tauri::AppHandle) {
     use tauri::WebviewWindowBuilder;
     use tauri::WebviewUrl;
@@ -389,7 +661,17 @@ fn create_new_note_backend(app: &tauri::AppHandle) {
         .unwrap()
         .as_millis();
     let new_id = format!("note-{}", timestamp);
-    let temp_file_path = format!("/tmp/{}.md", new_id);
+
+    // Use permanent directory for notes
+    let notes_dir = match ensure_notes_dir() {
+        Ok(dir) => dir,
+        Err(e) => {
+            eprintln!("Failed to create notes directory: {}", e);
+            return;
+        }
+    };
+    let file_path = notes_dir.join(format!("{}.md", new_id));
+    let file_path_str = file_path.to_string_lossy().to_string();
 
     // Random offset for window position
     let random_offset = (timestamp % 100) as i32 + 50;
@@ -397,7 +679,7 @@ fn create_new_note_backend(app: &tauri::AppHandle) {
     // Create sticker data
     let sticker_data = StickerData {
         id: new_id.clone(),
-        file_path: temp_file_path.clone(),
+        file_path: file_path_str.clone(),
         x: 150 + random_offset,
         y: 150 + random_offset,
         width: 400,
@@ -408,7 +690,7 @@ fn create_new_note_backend(app: &tauri::AppHandle) {
     };
 
     // Write empty file
-    if let Err(e) = fs::write(&temp_file_path, "") {
+    if let Err(e) = fs::write(&file_path, "") {
         eprintln!("Failed to create file: {}", e);
         return;
     }

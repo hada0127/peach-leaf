@@ -426,14 +426,33 @@
     const windowLabel = currentWindow.label;
 
     console.log(`[${data.id}] Window label: ${windowLabel}`);
+    console.log(`[${data.id}] Initial data:`, data);
+
+    // Props로 받은 배경색 적용
+    if (data.backgroundColor) {
+      backgroundColor = data.backgroundColor;
+      console.log(`[${windowLabel}] Applied backgroundColor from props:`, data.backgroundColor);
+    }
 
     // 윈도우별 컬러 선택 이벤트 리스닝
-    unlistenColorSelected = await listen(`color-selected-${windowLabel}`, (event: any) => {
+    unlistenColorSelected = await listen(`color-selected-${windowLabel}`, async (event: any) => {
       const eventData = event.payload;
       console.log(`[${windowLabel}] Color event received:`, eventData);
 
       backgroundColor = eventData.color;
       console.log(`[${windowLabel}] Color applied:`, eventData.color);
+
+      // Update backend metadata with new color
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        await invoke('update_window_metadata', {
+          windowLabel: windowLabel,
+          backgroundColor: eventData.color
+        });
+        console.log(`[${windowLabel}] Updated backend metadata with color:`, eventData.color);
+      } catch (error) {
+        console.error(`[${windowLabel}] Failed to update window metadata:`, error);
+      }
     });
 
     console.log(`[${data.id}] Listening for close_note_${windowLabel}`);
