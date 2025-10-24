@@ -125,6 +125,12 @@ async fn save_window_state(app: tauri::AppHandle) -> Result<(), String> {
             .map(|data| data.background_color.clone())
             .unwrap_or_else(|| "#FEFCE8".to_string());
 
+        // Get mode from metadata, or use default
+        let mode = metadata
+            .get(label.as_str())
+            .map(|data| data.mode.clone())
+            .unwrap_or_else(|| "edit".to_string());
+
         // Create file path for this window using permanent directory
         let notes_dir = get_notes_dir();
         let file_path = notes_dir.join(format!("{}.md", label));
@@ -132,9 +138,9 @@ async fn save_window_state(app: tauri::AppHandle) -> Result<(), String> {
 
         // Debug: check if metadata exists for this window
         if metadata.contains_key(label.as_str()) {
-            println!("Found metadata for window {}: color={}", label, background_color);
+            println!("Found metadata for window {}: color={}, mode={}", label, background_color, mode);
         } else {
-            println!("No metadata found for window {}, using default color", label);
+            println!("No metadata found for window {}, using defaults", label);
         }
 
         let sticker_data = StickerData {
@@ -146,12 +152,12 @@ async fn save_window_state(app: tauri::AppHandle) -> Result<(), String> {
             height,
             background_color: background_color.clone(),
             text_color: "#333333".to_string(),
-            mode: "edit".to_string(),
+            mode: mode.clone(),
         };
 
         windows_data.push(sticker_data);
-        println!("Saved window {}: position=({}, {}), size=({}x{}), color={}, path={}",
-                 label, x, y, width, height, background_color, file_path_str);
+        println!("Saved window {}: position=({}, {}), size=({}x{}), color={}, mode={}, path={}",
+                 label, x, y, width, height, background_color, mode, file_path_str);
     }
 
     save_app_state(windows_data)?;
@@ -178,11 +184,27 @@ static WINDOW_METADATA: once_cell::sync::Lazy<Arc<Mutex<HashMap<String, StickerD
     once_cell::sync::Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
 
 #[tauri::command]
-async fn update_window_metadata(window_label: String, background_color: String) -> Result<(), String> {
+async fn update_window_metadata(
+    window_label: String,
+    background_color: Option<String>,
+    mode: Option<String>
+) -> Result<(), String> {
+    println!("update_window_metadata called: window={}, bg_color={:?}, mode={:?}",
+             window_label, background_color, mode);
+
     let mut metadata = WINDOW_METADATA.lock().unwrap();
 
     if let Some(data) = metadata.get_mut(&window_label) {
-        data.background_color = background_color;
+        if let Some(bg_color) = background_color {
+            println!("Updating background_color for {}: {}", window_label, bg_color);
+            data.background_color = bg_color;
+        }
+        if let Some(new_mode) = mode {
+            println!("Updating mode for {}: {}", window_label, new_mode);
+            data.mode = new_mode.clone();
+        }
+        println!("Updated metadata for {}: color={}, mode={}",
+                 window_label, data.background_color, data.mode);
     } else {
         // If metadata doesn't exist yet, create it with minimal info
         let notes_dir = ensure_notes_dir()?;
@@ -195,9 +217,9 @@ async fn update_window_metadata(window_label: String, background_color: String) 
             y: 0,
             width: 400,
             height: 300,
-            background_color,
+            background_color: background_color.unwrap_or_else(|| "#FEFCE8".to_string()),
             text_color: "#333333".to_string(),
-            mode: "edit".to_string(),
+            mode: mode.unwrap_or_else(|| "edit".to_string()),
         });
     }
 
@@ -230,11 +252,16 @@ fn save_window_state_sync(app: &tauri::AppHandle) -> Result<(), String> {
         let width = (size.width as f64 / scale_factor) as u32;
         let height = (size.height as f64 / scale_factor) as u32;
 
-        // Get background color from metadata, or use default
+        // Get background color and mode from metadata, or use defaults
         let background_color = metadata
             .get(label.as_str())
             .map(|data| data.background_color.clone())
             .unwrap_or_else(|| "#FEFCE8".to_string());
+
+        let mode = metadata
+            .get(label.as_str())
+            .map(|data| data.mode.clone())
+            .unwrap_or_else(|| "edit".to_string());
 
         // Create file path for this window using permanent directory
         let notes_dir = get_notes_dir();
@@ -250,19 +277,19 @@ fn save_window_state_sync(app: &tauri::AppHandle) -> Result<(), String> {
             height,
             background_color: background_color.clone(),
             text_color: "#333333".to_string(),
-            mode: "edit".to_string(),
+            mode: mode.clone(),
         };
 
         // Debug: check if metadata exists for this window
         if metadata.contains_key(label.as_str()) {
-            println!("Found metadata for window {}: color={}", label, background_color);
+            println!("Found metadata for window {}: color={}, mode={}", label, background_color, mode);
         } else {
-            println!("No metadata found for window {}, using default color", label);
+            println!("No metadata found for window {}, using defaults", label);
         }
 
         windows_data.push(sticker_data);
-        println!("Saved window {}: position=({}, {}), size=({}x{}), color={}, path={}",
-                 label, x, y, width, height, background_color, file_path_str);
+        println!("Saved window {}: position=({}, {}), size=({}x{}), color={}, mode={}, path={}",
+                 label, x, y, width, height, background_color, mode, file_path_str);
     }
 
     save_app_state(windows_data)?;

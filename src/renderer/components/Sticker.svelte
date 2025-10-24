@@ -94,7 +94,7 @@
     saveFile();
   }
 
-  function toggleMode() {
+  async function toggleMode() {
     console.log('toggleMode called, current mode:', mode);
 
     // 편집 모드와 미리보기 모드만 토글
@@ -102,8 +102,24 @@
 
     console.log('Mode changed to:', mode);
 
-    if (window.electron) {
-      window.electron.updateStickerConfig(data.id, { mode });
+    // Update backend metadata with new mode and save state
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      const currentWindow = getCurrentWindow();
+      const windowLabel = currentWindow.label;
+
+      await invoke('update_window_metadata', {
+        windowLabel: windowLabel,
+        backgroundColor: null,
+        mode: mode
+      });
+      console.log(`[${windowLabel}] Updated backend metadata with mode:`, mode);
+
+      // Save window state immediately after mode change
+      await saveWindowState();
+    } catch (error) {
+      console.error('Failed to update window metadata:', error);
     }
   }
 
@@ -474,7 +490,8 @@
         const { invoke } = await import('@tauri-apps/api/core');
         await invoke('update_window_metadata', {
           windowLabel: windowLabel,
-          backgroundColor: eventData.color
+          backgroundColor: eventData.color,
+          mode: null
         });
         console.log(`[${windowLabel}] Updated backend metadata with color:`, eventData.color);
 
