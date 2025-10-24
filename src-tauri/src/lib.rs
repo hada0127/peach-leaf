@@ -91,6 +91,9 @@ async fn save_window_state(app: tauri::AppHandle) -> Result<(), String> {
     println!("Saving window state...");
     let mut windows_data = Vec::new();
 
+    // Get metadata
+    let metadata = WINDOW_METADATA.lock().unwrap();
+
     for (label, window) in app.webview_windows().iter() {
         // Skip color picker window
         if label.as_str() == "color-picker" {
@@ -110,23 +113,39 @@ async fn save_window_state(app: tauri::AppHandle) -> Result<(), String> {
         let width = (size.width as f64 / scale_factor) as u32;
         let height = (size.height as f64 / scale_factor) as u32;
 
-        // Create file path for this window
-        let file_path = format!("/tmp/{}.md", label);
+        // Get background color from metadata, or use default
+        let background_color = metadata
+            .get(label.as_str())
+            .map(|data| data.background_color.clone())
+            .unwrap_or_else(|| "#FEFCE8".to_string());
+
+        // Create file path for this window using permanent directory
+        let notes_dir = get_notes_dir();
+        let file_path = notes_dir.join(format!("{}.md", label));
+        let file_path_str = file_path.to_string_lossy().to_string();
+
+        // Debug: check if metadata exists for this window
+        if metadata.contains_key(label.as_str()) {
+            println!("Found metadata for window {}: color={}", label, background_color);
+        } else {
+            println!("No metadata found for window {}, using default color", label);
+        }
 
         let sticker_data = StickerData {
             id: label.to_string(),
-            file_path,
+            file_path: file_path_str.clone(),
             x,
             y,
             width,
             height,
-            background_color: "#FEFCE8".to_string(), // Default color, will be updated by frontend
+            background_color: background_color.clone(),
             text_color: "#333333".to_string(),
             mode: "edit".to_string(),
         };
 
         windows_data.push(sticker_data);
-        println!("Saved window {}: position=({}, {}), size=({}x{})", label, x, y, width, height);
+        println!("Saved window {}: position=({}, {}), size=({}x{}), color={}, path={}",
+                 label, x, y, width, height, background_color, file_path_str);
     }
 
     save_app_state(windows_data)?;
@@ -227,6 +246,13 @@ fn save_window_state_sync(app: &tauri::AppHandle) -> Result<(), String> {
             text_color: "#333333".to_string(),
             mode: "edit".to_string(),
         };
+
+        // Debug: check if metadata exists for this window
+        if metadata.contains_key(label.as_str()) {
+            println!("Found metadata for window {}: color={}", label, background_color);
+        } else {
+            println!("No metadata found for window {}, using default color", label);
+        }
 
         windows_data.push(sticker_data);
         println!("Saved window {}: position=({}, {}), size=({}x{}), color={}, path={}",
@@ -441,12 +467,9 @@ pub fn run() {
 
                 println!("Menu clicked: {}", menu_id);
 
-                // Handle quit_app: save state and quit
+                // Handle quit_app: just quit (state is saved on every change)
                 if menu_id == "quit_app" {
                     println!("Handling quit_app in backend");
-                    if let Err(e) = save_window_state_sync(app) {
-                        eprintln!("Failed to save window state: {}", e);
-                    }
 
                     // Close all windows
                     let windows: Vec<_> = app.webview_windows().keys().map(|k| k.to_string()).collect();
@@ -624,6 +647,13 @@ fn restore_window(app: &tauri::AppHandle, sticker_data: StickerData) {
 
     println!("Restoring window: {} at ({}, {})", sticker_data.id, sticker_data.x, sticker_data.y);
 
+    // Populate WINDOW_METADATA with the restored window's data
+    {
+        let mut metadata = WINDOW_METADATA.lock().unwrap();
+        metadata.insert(sticker_data.id.clone(), sticker_data.clone());
+        println!("Populated metadata for window {}: color={}", sticker_data.id, sticker_data.background_color);
+    }
+
     match WebviewWindowBuilder::new(
         app,
         &sticker_data.id,
@@ -720,6 +750,11 @@ fn create_new_note_backend(app: &tauri::AppHandle) {
             // Send sticker data to the window
             if let Err(e) = window.emit("init-sticker", sticker_data) {
                 eprintln!("Failed to emit init-sticker: {}", e);
+            }
+
+            // Save window state immediately after creating new window
+            if let Err(e) = save_window_state_sync(app) {
+                eprintln!("Failed to save window state after creating new note: {}", e);
             }
         }
         Err(e) => {

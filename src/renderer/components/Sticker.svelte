@@ -73,8 +73,20 @@
 
     saveTimeout = window.setTimeout(async () => {
       await window.electron.writeFile(data.filePath, content);
+      // Also save window state after content changes
+      await saveWindowState();
       saveTimeout = null;
     }, 500);
+  }
+
+  async function saveWindowState() {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('save_window_state');
+      console.log('[Sticker] Window state saved');
+    } catch (error) {
+      console.error('[Sticker] Failed to save window state:', error);
+    }
   }
 
   function handleContentChange(event: CustomEvent<string>) {
@@ -139,6 +151,9 @@
           return; // User cancelled, don't close
         }
       }
+
+      // Save window state before closing
+      await saveWindowState();
 
       // Close the window
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
@@ -420,6 +435,8 @@
   let unlistenColorSelected: (() => void) | null = null;
   let unlistenCloseNote: (() => void) | null = null;
   let unlistenOpenColorPicker: (() => void) | null = null;
+  let unlistenResized: (() => void) | null = null;
+  let unlistenMoved: (() => void) | null = null;
 
   onMount(async () => {
     loadFile();
@@ -455,7 +472,7 @@
       backgroundColor = eventData.color;
       console.log(`[${windowLabel}] Color applied:`, eventData.color);
 
-      // Update backend metadata with new color
+      // Update backend metadata with new color and save state
       try {
         const { invoke } = await import('@tauri-apps/api/core');
         await invoke('update_window_metadata', {
@@ -463,6 +480,9 @@
           backgroundColor: eventData.color
         });
         console.log(`[${windowLabel}] Updated backend metadata with color:`, eventData.color);
+
+        // Save window state immediately after color change
+        await saveWindowState();
       } catch (error) {
         console.error(`[${windowLabel}] Failed to update window metadata:`, error);
       }
@@ -482,6 +502,18 @@
       console.log(`[${data.id}] Received open_color_picker event for this window`);
       openColorPicker();
     });
+
+    // Listen for window resize events
+    unlistenResized = await currentWindow.onResized(async () => {
+      console.log(`[${windowLabel}] Window resized, saving state...`);
+      await saveWindowState();
+    });
+
+    // Listen for window move events
+    unlistenMoved = await currentWindow.onMoved(async () => {
+      console.log(`[${windowLabel}] Window moved, saving state...`);
+      await saveWindowState();
+    });
   });
 
   onDestroy(() => {
@@ -493,6 +525,8 @@
     if (unlistenColorSelected) unlistenColorSelected();
     if (unlistenCloseNote) unlistenCloseNote();
     if (unlistenOpenColorPicker) unlistenOpenColorPicker();
+    if (unlistenResized) unlistenResized();
+    if (unlistenMoved) unlistenMoved();
   });
 </script>
 
