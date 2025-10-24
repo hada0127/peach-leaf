@@ -25,6 +25,9 @@
   let isDragging = $state(false);
   let dragStartX = $state(0);
   let dragStartY = $state(0);
+  let windowX = $state(0);
+  let windowY = $state(0);
+  let scaleFactor = $state(1);
   let saveTimeout: number | null = null;
 
   async function loadFile() {
@@ -93,7 +96,7 @@
     }
   }
 
-  function startDrag(e: MouseEvent) {
+  async function startDrag(e: MouseEvent) {
     console.log('startDrag called, target:', e.target);
 
     // 버튼 클릭은 드래그로 처리하지 않음
@@ -107,28 +110,58 @@
     console.log('toolbar found:', toolbar);
     if (toolbar) {
       console.log('Starting drag');
+
+      // 현재 윈도우 위치 가져오기
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      const currentWindow = getCurrentWindow();
+      const position = await currentWindow.outerPosition();
+
+      // macOS에서 물리적 픽셀과 논리적 픽셀이 다를 수 있음
+      scaleFactor = await currentWindow.scaleFactor();
+      windowX = position.x;
+      windowY = position.y;
+
       isDragging = true;
       dragStartX = e.screenX;
       dragStartY = e.screenY;
       e.preventDefault(); // 기본 동작 방지
+
+      console.log('Scale factor:', scaleFactor, 'Initial position:', windowX, windowY);
     }
   }
 
-  async function handleDrag(e: MouseEvent) {
+  function handleDrag(e: MouseEvent) {
     if (isDragging && e.screenX !== 0 && e.screenY !== 0) {
-      const deltaX = e.screenX - dragStartX;
-      const deltaY = e.screenY - dragStartY;
+      // screenX/screenY는 논리적 픽셀, PhysicalPosition은 물리적 픽셀을 기대
+      // scaleFactor를 곱해서 물리적 픽셀로 변환
+      const deltaX = (e.screenX - dragStartX) * scaleFactor;
+      const deltaY = (e.screenY - dragStartY) * scaleFactor;
+
+      console.log('Mouse delta (logical):', e.screenX - dragStartX, e.screenY - dragStartY);
+      console.log('Mouse delta (physical):', deltaX, deltaY);
+
+      // 누적된 delta 값으로 새 위치 계산
+      windowX += deltaX;
+      windowY += deltaY;
+
       dragStartX = e.screenX;
       dragStartY = e.screenY;
 
-      console.log('Moving by:', deltaX, deltaY);
+      console.log('Setting window to:', windowX, windowY);
 
-      // Tauri API 사용
+      // 비동기로 윈도우 위치 업데이트 (await 하지 않음)
+      updateWindowPosition(windowX, windowY);
+    }
+  }
+
+  async function updateWindowPosition(x: number, y: number) {
+    try {
       const { getCurrentWindow, PhysicalPosition } = await import('@tauri-apps/api/window');
       const currentWindow = getCurrentWindow();
-      const position = await currentWindow.outerPosition();
-      const newPosition = new PhysicalPosition(position.x + deltaX, position.y + deltaY);
+      const newPosition = new PhysicalPosition(Math.round(x), Math.round(y));
       await currentWindow.setPosition(newPosition);
+    } catch (error) {
+      console.error('Failed to update window position:', error);
     }
   }
 
