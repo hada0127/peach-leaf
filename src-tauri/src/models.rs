@@ -5,6 +5,7 @@ fn default_font_size() -> u32 {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StickerData {
     pub id: String,
     pub file_path: String,

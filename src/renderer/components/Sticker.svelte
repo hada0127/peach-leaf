@@ -546,7 +546,7 @@
   />
 
   <div class="content" style="font-size: {fontSize}px;">
-    {#key mode}
+    {#key `${mode}-${fontSize}`}
       {#if mode === 'edit'}
         <MarkdownEditor
           {content}
