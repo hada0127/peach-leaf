@@ -392,7 +392,7 @@ fn create_new_note_backend(app: &tauri::AppHandle) {
     };
 
     // Write empty file
-    if let Err(e) = fs::write(&temp_file_path, "# New Note\n\n") {
+    if let Err(e) = fs::write(&temp_file_path, "") {
         eprintln!("Failed to create file: {}", e);
         return;
     }

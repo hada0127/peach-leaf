@@ -96,6 +96,7 @@
   async function handleClose() {
     try {
       console.log(`[${data.id}] handleClose called`);
+      console.log(`[${data.id}] raw content:`, JSON.stringify(content));
 
       // Check if there's content in the note
       const trimmedContent = content.trim();
@@ -103,16 +104,14 @@
       console.log(`[${data.id}] trimmedContent:`, JSON.stringify(trimmedContent));
       console.log(`[${data.id}] content length:`, trimmedContent.length);
 
-      // Ignore default content "# New Note" or empty content
-      // Check various formats of default content
+      // The default content is "# New Note" (after trimming)
+      // Consider the note empty if it only contains the default heading
       const isDefaultContent = trimmedContent === '' ||
-                               trimmedContent === '# New Note' ||
-                               trimmedContent === '#NewNote' ||
-                               trimmedContent === '# New Note\n' ||
-                               trimmedContent === '# New Note\n\n';
+                               trimmedContent === '# New Note';
 
-      const hasRealContent = trimmedContent.length > 0 && !isDefaultContent;
+      const hasRealContent = !isDefaultContent;
 
+      console.log(`[${data.id}] isDefaultContent:`, isDefaultContent);
       console.log(`[${data.id}] hasRealContent:`, hasRealContent);
 
       // If there's real content, show confirmation dialog
