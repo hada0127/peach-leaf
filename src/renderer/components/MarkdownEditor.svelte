@@ -39,6 +39,7 @@
         highlightActiveLine(),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         markdown(),
+        EditorView.lineWrapping, // 자동 줄바꿈 활성화
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             const newContent = update.state.doc.toString();

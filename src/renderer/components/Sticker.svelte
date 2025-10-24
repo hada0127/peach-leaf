@@ -285,8 +285,13 @@
         const { readText } = await import('@tauri-apps/plugin-clipboard-manager');
         const text = await readText();
         const selection = editorView.state.selection.main;
+        const from = selection.from;
+        const to = selection.to;
+        const insertLength = text.length;
+
         editorView.dispatch({
-          changes: { from: selection.from, to: selection.to, insert: text }
+          changes: { from, to, insert: text },
+          selection: { anchor: from + insertLength }
         });
       } catch (error) {
         console.error('Failed to paste:', error);
