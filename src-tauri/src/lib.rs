@@ -542,10 +542,25 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|_app_handle, event| {
-            // Prevent app from exiting when all windows are closed
-            if let RunEvent::ExitRequested { api, .. } = event {
-                api.prevent_exit();
+        .run(|app_handle, event| {
+            match event {
+                // Prevent app from exiting when all windows are closed
+                RunEvent::ExitRequested { api, .. } => {
+                    api.prevent_exit();
+                }
+                // Save state when a window is destroyed
+                RunEvent::WindowEvent { label, event: window_event, .. } => {
+                    if let tauri::WindowEvent::Destroyed = window_event {
+                        println!("Window {} was destroyed, saving state...", label);
+                        let app = app_handle.clone();
+                        tauri::async_runtime::spawn(async move {
+                            if let Err(e) = save_window_state(app).await {
+                                eprintln!("Failed to save window state after window close: {}", e);
+                            }
+                        });
+                    }
+                }
+                _ => {}
             }
         });
 }

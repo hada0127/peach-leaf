@@ -152,10 +152,7 @@
         }
       }
 
-      // Save window state before closing
-      await saveWindowState();
-
-      // Close the window
+      // Close the window (state will be saved automatically by backend after window is destroyed)
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       const currentWindow = getCurrentWindow();
       await currentWindow.close();
