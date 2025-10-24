@@ -165,6 +165,11 @@
         }
       }
 
+      // Delete the note file
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('delete_note_file', { noteId: data.id });
+      console.log(`[${data.id}] Note file deleted`);
+
       // Close the window (state will be saved automatically by backend after window is destroyed)
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       const currentWindow = getCurrentWindow();

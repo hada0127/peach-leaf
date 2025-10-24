@@ -93,6 +93,67 @@ async fn select_file(_app: tauri::AppHandle) -> Result<Option<String>, String> {
 }
 
 #[tauri::command]
+async fn delete_note_file(note_id: String) -> Result<(), String> {
+    let notes_dir = get_notes_dir();
+    let file_path = notes_dir.join(format!("{}.md", note_id));
+
+    println!("Deleting note file: {:?}", file_path);
+
+    if file_path.exists() {
+        fs::remove_file(&file_path)
+            .map_err(|e| e.to_string())?;
+        println!("Successfully deleted note file: {}", note_id);
+    } else {
+        println!("Note file does not exist: {}", note_id);
+    }
+
+    Ok(())
+}
+
+fn cleanup_orphaned_notes(state: &AppState) -> Result<(), String> {
+    let notes_dir = get_notes_dir();
+
+    // Get all note IDs from state.json
+    let valid_ids: std::collections::HashSet<String> = state.windows
+        .iter()
+        .map(|w| w.id.clone())
+        .collect();
+
+    println!("Valid note IDs from state.json: {:?}", valid_ids);
+
+    // Read all .md files in notes directory
+    match fs::read_dir(&notes_dir) {
+        Ok(entries) => {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    let path = entry.path();
+                    if path.extension().and_then(|s| s.to_str()) == Some("md") {
+                        if let Some(file_stem) = path.file_stem().and_then(|s| s.to_str()) {
+                            let note_id = file_stem.to_string();
+
+                            // If this note ID is not in state.json, delete it
+                            if !valid_ids.contains(&note_id) {
+                                println!("Deleting orphaned note file: {:?}", path);
+                                if let Err(e) = fs::remove_file(&path) {
+                                    eprintln!("Failed to delete orphaned note {}: {}", note_id, e);
+                                } else {
+                                    println!("Successfully deleted orphaned note: {}", note_id);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(())
+        }
+        Err(e) => {
+            eprintln!("Failed to read notes directory: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
+#[tauri::command]
 async fn save_window_state(app: tauri::AppHandle) -> Result<(), String> {
     println!("Saving window state...");
     let mut windows_data = Vec::new();
@@ -455,6 +516,7 @@ pub fn run() {
             read_file,
             write_file,
             select_file,
+            delete_note_file,
             create_sticker_window,
             open_color_picker,
             close_color_picker,
@@ -473,6 +535,11 @@ pub fn run() {
             let app_handle = app.app_handle();
             match load_app_state() {
                 Ok(state) => {
+                    // Clean up orphaned note files before restoring windows
+                    if let Err(e) = cleanup_orphaned_notes(&state) {
+                        eprintln!("Failed to cleanup orphaned notes: {}", e);
+                    }
+
                     if state.windows.is_empty() {
                         println!("No saved windows, creating default window");
                         if let Err(e) = create_main_window(&app_handle) {
