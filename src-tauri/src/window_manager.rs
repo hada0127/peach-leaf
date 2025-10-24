@@ -74,7 +74,6 @@ pub fn create_main_window(app: &tauri::AppHandle) -> Result<(), tauri::Error> {
     .inner_size(400.0, 300.0)
     .resizable(true)
     .decorations(false)
-    .transparent(true)
     .always_on_top(false)
     .build()?;
 
@@ -171,7 +170,6 @@ pub fn restore_window(app: &tauri::AppHandle, sticker_data: StickerData) {
     .position(abs_x as f64, abs_y as f64)
     .decorations(false)
     .resizable(true)
-    .transparent(true)
     .always_on_top(false)
     .build() {
         Ok(window) => {
@@ -226,10 +224,10 @@ pub fn create_new_note_backend(app: &tauri::AppHandle) {
         y: 150 + random_offset,
         width: 400,
         height: 300,
-        background_color: "#FEFCE8".to_string(),
+        background_color: "#FFFBEB".to_string(),  // Amber - warm yellow color
         text_color: "#333333".to_string(),
         mode: "edit".to_string(),
-        font_size: 14,
+        font_size: 12,  // Default font size 12px
         monitor_name: None,
         monitor_position: None,
         monitor_size: None,

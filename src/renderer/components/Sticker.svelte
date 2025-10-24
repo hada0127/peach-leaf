@@ -54,7 +54,7 @@
       content = fileContent as string;
     } catch (error) {
       console.error('[Sticker] Failed to load file:', error);
-      content = '# New Note\n\n';
+      content = '';
     }
   }
 
@@ -156,10 +156,9 @@
       console.log(`[${data.id}] trimmedContent:`, JSON.stringify(trimmedContent));
       console.log(`[${data.id}] content length:`, trimmedContent.length);
 
-      // The default content is "# New Note" (after trimming)
-      // Consider the note empty if it only contains the default heading
-      const isDefaultContent = trimmedContent === '' ||
-                               trimmedContent === '# New Note';
+      // The default content is empty string
+      // Consider the note empty if it has no content
+      const isDefaultContent = trimmedContent === '';
 
       const hasRealContent = !isDefaultContent;
 
