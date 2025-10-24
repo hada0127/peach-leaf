@@ -142,17 +142,18 @@ async fn apply_color(
 ) -> Result<(), String> {
     println!("apply_color called: parent={}, color={}", parent_label, color);
 
-    // Get parent window and emit color-selected event to it
+    // Get parent window and emit window-specific color-selected event to it
     if let Some(parent_window) = app.get_webview_window(&parent_label) {
         #[derive(serde::Serialize, Clone)]
         struct ColorData {
             color: String,
         }
 
-        parent_window.emit("color-selected", ColorData { color: color.clone() })
+        let event_name = format!("color-selected-{}", parent_label);
+        parent_window.emit(&event_name, ColorData { color: color.clone() })
             .map_err(|e| e.to_string())?;
 
-        println!("Emitted color-selected event to window: {}", parent_label);
+        println!("Emitted {} event to window: {}", event_name, parent_label);
     } else {
         println!("Parent window not found: {}", parent_label);
         return Err(format!("Parent window not found: {}", parent_label));
@@ -225,6 +226,21 @@ pub fn run() {
                     }) {
                         println!("Emitting close_note to focused window: {}", focused_window.label());
                         let _ = focused_window.emit(&format!("close_note_{}", focused_window.label()), ());
+                    }
+                    return;
+                }
+
+                // Handle open_color_picker: open for focused window only
+                if menu_id == "open_color_picker" {
+                    println!("Handling open_color_picker in backend");
+                    if let Some(focused_window) = app.webview_windows().values().find(|w| {
+                        w.is_focused().unwrap_or(false)
+                    }) {
+                        let window_label = focused_window.label().to_string();
+                        println!("Opening color picker for focused window: {}", window_label);
+
+                        // Emit window-specific event
+                        let _ = focused_window.emit(&format!("open_color_picker_{}", window_label), ());
                     }
                     return;
                 }

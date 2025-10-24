@@ -320,12 +320,7 @@
         return;
       }
 
-      // Color Picker 열기
-      if (menuId === 'open_color_picker') {
-        console.log('Handling open_color_picker');
-        await openColorPicker();
-        return;
-      }
+      // Color Picker is now handled in backend via open_color_picker_event
 
       // Edit 메뉴
       if (menuId === 'undo' && editorView) {
@@ -411,6 +406,7 @@
   let unlistenMenu: (() => void) | null = null;
   let unlistenColorSelected: (() => void) | null = null;
   let unlistenCloseNote: (() => void) | null = null;
+  let unlistenOpenColorPicker: (() => void) | null = null;
 
   onMount(async () => {
     loadFile();
@@ -424,25 +420,35 @@
       handleMenuEvent(event.payload as string);
     });
 
-    // 컬러 선택 이벤트 리스닝
-    unlistenColorSelected = await listen('color-selected', (event: any) => {
-      const data = event.payload;
-      console.log('Color event received:', data);
-
-      backgroundColor = data.color;
-      console.log('Color applied:', data.color);
-    });
-
-    // 윈도우별 close_note 이벤트 리스닝
+    // 윈도우 정보 가져오기
     const { getCurrentWindow } = await import('@tauri-apps/api/window');
     const currentWindow = getCurrentWindow();
     const windowLabel = currentWindow.label;
 
+    console.log(`[${data.id}] Window label: ${windowLabel}`);
+
+    // 윈도우별 컬러 선택 이벤트 리스닝
+    unlistenColorSelected = await listen(`color-selected-${windowLabel}`, (event: any) => {
+      const eventData = event.payload;
+      console.log(`[${windowLabel}] Color event received:`, eventData);
+
+      backgroundColor = eventData.color;
+      console.log(`[${windowLabel}] Color applied:`, eventData.color);
+    });
+
     console.log(`[${data.id}] Listening for close_note_${windowLabel}`);
+    console.log(`[${data.id}] Listening for open_color_picker_${windowLabel}`);
+    console.log(`[${data.id}] Listening for color-selected-${windowLabel}`);
 
     unlistenCloseNote = await listen(`close_note_${windowLabel}`, () => {
       console.log(`[${data.id}] Received close_note event for this window`);
       handleClose();
+    });
+
+    // 색상 선택기 열기 이벤트 리스닝 (백엔드에서 포커스된 윈도우에만 전송)
+    unlistenOpenColorPicker = await listen(`open_color_picker_${windowLabel}`, () => {
+      console.log(`[${data.id}] Received open_color_picker event for this window`);
+      openColorPicker();
     });
   });
 
@@ -454,6 +460,7 @@
     if (unlistenMenu) unlistenMenu();
     if (unlistenColorSelected) unlistenColorSelected();
     if (unlistenCloseNote) unlistenCloseNote();
+    if (unlistenOpenColorPicker) unlistenOpenColorPicker();
   });
 </script>
 
