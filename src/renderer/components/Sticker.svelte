@@ -52,32 +52,30 @@
   });
 
   async function loadFile() {
-    if (!window.electron) {
-      // For testing without Electron
-      content = '# Test Markdown\n\nThis is a test note.\n\n- Item 1\n- Item 2\n\n**Bold text** and *italic text*.';
-      return;
-    }
-
-    const result = await window.electron.readFile(data.filePath);
-    if (result.success && result.content !== undefined) {
-      content = result.content;
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const fileContent = await invoke('read_file', { filePath: data.filePath });
+      content = fileContent as string;
+    } catch (error) {
+      console.error('[Sticker] Failed to load file:', error);
+      content = '# New Note\n\n';
     }
   }
 
   async function saveFile() {
-    if (!window.electron) {
-      console.log('Would save:', content);
-      return;
-    }
-
     if (saveTimeout) {
       clearTimeout(saveTimeout);
     }
 
     saveTimeout = window.setTimeout(async () => {
-      await window.electron.writeFile(data.filePath, content);
-      // Also save window state after content changes
-      await saveWindowState();
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        await invoke('write_file', { filePath: data.filePath, content });
+        // Also save window state after content changes
+        await saveWindowState();
+      } catch (error) {
+        console.error('[Sticker] Failed to save file:', error);
+      }
       saveTimeout = null;
     }, 500);
   }
@@ -126,12 +124,7 @@
   function handleColorChange(event: CustomEvent<{ bg: string; text: string }>) {
     backgroundColor = event.detail.bg;
     textColor = event.detail.text;
-    if (window.electron) {
-      window.electron.updateStickerConfig(data.id, {
-        backgroundColor,
-        textColor,
-      });
-    }
+    // Color is now handled by update_window_metadata and color-selected events
   }
 
   async function handleClose() {
