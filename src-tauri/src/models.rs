@@ -1,5 +1,9 @@
 use serde::{Deserialize, Serialize};
 
+fn default_font_size() -> u32 {
+    14
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StickerData {
     pub id: String,
@@ -11,6 +15,8 @@ pub struct StickerData {
     pub background_color: String,
     pub text_color: String,
     pub mode: String,
+    #[serde(default = "default_font_size")]
+    pub font_size: u32,
     #[serde(default)]
     pub monitor_name: Option<String>,
     #[serde(default)]

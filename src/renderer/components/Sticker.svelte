@@ -13,6 +13,7 @@
       backgroundColor: string;
       textColor: string;
       mode: 'edit' | 'preview';
+      fontSize: number;
     };
   }
 
@@ -22,7 +23,7 @@
   let mode = $state<'edit' | 'preview'>(data.mode);
   let backgroundColor = $state(data.backgroundColor);
   let textColor = $state(data.textColor);
-  let fontSize = $state(11); // Default font size
+  let fontSize = $state(data.fontSize || 14);
   let editorView: EditorView | null = null;
   let saveTimeout: number | null = null;
   let lastMenuEventTime = 0;
@@ -38,6 +39,7 @@
     backgroundColor = data.backgroundColor;
     textColor = data.textColor;
     mode = data.mode;
+    fontSize = data.fontSize || 14;
     // Reload file when filePath changes
     if (data.filePath) {
       console.log('[Sticker] File path changed to:', data.filePath);
@@ -104,7 +106,8 @@
       await invoke('update_window_metadata', {
         windowLabel: data.id,
         backgroundColor: null,
-        mode: mode
+        mode: mode,
+        fontSize: null
       });
       console.log(`[${data.id}] Updated backend metadata with mode:`, mode);
 
@@ -112,6 +115,27 @@
       await saveWindowState();
     } catch (error) {
       console.error('Failed to update window metadata:', error);
+    }
+  }
+
+  async function updateFontSize(size: number) {
+    console.log('updateFontSize called, new size:', size);
+
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+
+      await invoke('update_window_metadata', {
+        windowLabel: data.id,
+        backgroundColor: null,
+        mode: null,
+        fontSize: size
+      });
+      console.log(`[${data.id}] Updated backend metadata with font_size:`, size);
+
+      // Save window state immediately after font size change
+      await saveWindowState();
+    } catch (error) {
+      console.error('Failed to update font size:', error);
     }
   }
 
@@ -370,18 +394,19 @@
       // Font size
       if (menuId === 'font_small') {
         fontSize = 12;
+        await updateFontSize(12);
       }
       else if (menuId === 'font_medium') {
         fontSize = 14;
+        await updateFontSize(14);
       }
       else if (menuId === 'font_large') {
         fontSize = 16;
+        await updateFontSize(16);
       }
       else if (menuId === 'font_xlarge') {
         fontSize = 18;
-      }
-      else if (menuId === 'font_default') {
-        fontSize = 11;
+        await updateFontSize(18);
       }
       // Window
       else if (menuId === 'minimize') {
@@ -479,6 +504,19 @@
       if (!isDragging) {
         console.log(`[${data.id}] Window moved, saving state...`);
         await saveWindowState();
+      }
+    });
+
+    // Listen for window focus events to update font menu checks
+    await currentWindow.onFocusChanged(async ({ payload: focused }) => {
+      if (focused) {
+        console.log(`[${data.id}] Window focused, updating font menu`);
+        const { invoke } = await import('@tauri-apps/api/core');
+        try {
+          await invoke('on_window_focus', { windowLabel: data.id });
+        } catch (error) {
+          console.error(`[${data.id}] Failed to update font menu:`, error);
+        }
       }
     });
   });

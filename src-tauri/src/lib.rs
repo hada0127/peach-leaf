@@ -27,7 +27,8 @@ pub fn run() {
             commands::window::save_window_state,
             commands::window::get_saved_state,
             commands::window::get_window_data,
-            commands::window::update_window_metadata
+            commands::window::update_window_metadata,
+            commands::window::on_window_focus
         ])
         .setup(|app| {
             // Create menu

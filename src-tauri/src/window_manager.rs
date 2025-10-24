@@ -229,6 +229,7 @@ pub fn create_new_note_backend(app: &tauri::AppHandle) {
         background_color: "#FEFCE8".to_string(),
         text_color: "#333333".to_string(),
         mode: "edit".to_string(),
+        font_size: 14,
         monitor_name: None,
         monitor_position: None,
         monitor_size: None,

@@ -1,7 +1,18 @@
-use tauri::menu::{Menu, MenuBuilder, SubmenuBuilder, MenuItemBuilder};
+use tauri::menu::{Menu, MenuBuilder, SubmenuBuilder, MenuItemBuilder, CheckMenuItemBuilder, CheckMenuItem};
 use tauri::{Manager, Emitter};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+
+// Store for font menu items
+pub static FONT_MENU_ITEMS: once_cell::sync::Lazy<Arc<Mutex<Option<FontMenuItems>>>> =
+    once_cell::sync::Lazy::new(|| Arc::new(Mutex::new(None)));
+
+pub struct FontMenuItems {
+    pub small: CheckMenuItem<tauri::Wry>,
+    pub medium: CheckMenuItem<tauri::Wry>,
+    pub large: CheckMenuItem<tauri::Wry>,
+    pub xlarge: CheckMenuItem<tauri::Wry>,
+}
 
 pub fn create_menu(app: &tauri::App) -> Result<Menu<tauri::Wry>, tauri::Error> {
     use tauri::menu::PredefinedMenuItem;
@@ -29,14 +40,36 @@ pub fn create_menu(app: &tauri::App) -> Result<Menu<tauri::Wry>, tauri::Error> {
         .item(&MenuItemBuilder::new("Paste").id("paste").accelerator("CmdOrCtrl+V").build(app)?)
         .build()?;
 
-    // Font Menu
+    // Font Menu with check items (default is Medium - 14px)
+    let font_small = CheckMenuItemBuilder::with_id("font_small", "Small (12px)")
+        .checked(false)
+        .build(app)?;
+    let font_medium = CheckMenuItemBuilder::with_id("font_medium", "Medium (14px)")
+        .checked(true)
+        .build(app)?;
+    let font_large = CheckMenuItemBuilder::with_id("font_large", "Large (16px)")
+        .checked(false)
+        .build(app)?;
+    let font_xlarge = CheckMenuItemBuilder::with_id("font_xlarge", "Extra Large (18px)")
+        .checked(false)
+        .build(app)?;
+
+    // Store font menu items for later access
+    {
+        let mut items = FONT_MENU_ITEMS.lock().unwrap();
+        *items = Some(FontMenuItems {
+            small: font_small.clone(),
+            medium: font_medium.clone(),
+            large: font_large.clone(),
+            xlarge: font_xlarge.clone(),
+        });
+    }
+
     let font_menu = SubmenuBuilder::new(app, "Font")
-        .item(&MenuItemBuilder::new("Default Font").id("font_default").build(app)?)
-        .separator()
-        .item(&MenuItemBuilder::new("Small (12px)").id("font_small").build(app)?)
-        .item(&MenuItemBuilder::new("Medium (14px)").id("font_medium").build(app)?)
-        .item(&MenuItemBuilder::new("Large (16px)").id("font_large").build(app)?)
-        .item(&MenuItemBuilder::new("Extra Large (18px)").id("font_xlarge").build(app)?)
+        .item(&font_small)
+        .item(&font_medium)
+        .item(&font_large)
+        .item(&font_xlarge)
         .build()?;
 
     // Color Menu - single item that opens picker
@@ -80,8 +113,19 @@ pub fn create_menu(app: &tauri::App) -> Result<Menu<tauri::Wry>, tauri::Error> {
     Ok(menu)
 }
 
+/// Update font menu checks based on font size
+pub fn update_font_menu_checks(font_size: u32) {
+    if let Some(ref items) = *FONT_MENU_ITEMS.lock().unwrap() {
+        let _ = items.small.set_checked(font_size == 12);
+        let _ = items.medium.set_checked(font_size == 14);
+        let _ = items.large.set_checked(font_size == 16);
+        let _ = items.xlarge.set_checked(font_size == 18);
+    }
+}
+
 pub fn setup_menu_handler(app: &tauri::AppHandle) {
     use crate::window_manager::create_new_note_backend;
+    use crate::commands::window::WINDOW_METADATA;
 
     // Handle menu events with debouncing
     let last_menu_event: Arc<Mutex<Option<(String, Instant)>>> = Arc::new(Mutex::new(None));
@@ -154,6 +198,20 @@ pub fn setup_menu_handler(app: &tauri::AppHandle) {
                 let _ = focused_window.emit(&format!("open_color_picker_{}", window_label), ());
             }
             return;
+        }
+
+        // Handle font menu items: update check state
+        if menu_id.starts_with("font_") {
+            let font_size = match menu_id {
+                "font_small" => 12,
+                "font_medium" => 14,
+                "font_large" => 16,
+                "font_xlarge" => 18,
+                _ => 14,
+            };
+
+            // Update menu check state
+            update_font_menu_checks(font_size);
         }
 
         // Emit event to the focused window (for other menu items)
