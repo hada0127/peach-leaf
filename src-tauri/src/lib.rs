@@ -100,7 +100,12 @@ async fn save_window_state(app: tauri::AppHandle) -> Result<(), String> {
     // Get metadata
     let metadata = WINDOW_METADATA.lock().unwrap();
 
-    for (label, window) in app.webview_windows().iter() {
+    // Sort windows by label to ensure consistent order
+    let webview_windows = app.webview_windows();
+    let mut windows: Vec<_> = webview_windows.iter().collect();
+    windows.sort_by_key(|(label, _)| label.as_str());
+
+    for (label, window) in windows {
         // Skip color picker window
         if label.as_str() == "color-picker" {
             continue;
@@ -159,6 +164,9 @@ async fn save_window_state(app: tauri::AppHandle) -> Result<(), String> {
         println!("Saved window {}: position=({}, {}), size=({}x{}), color={}, mode={}, path={}",
                  label, x, y, width, height, background_color, mode, file_path_str);
     }
+
+    // Sort windows_data by id to ensure consistent order in state.json
+    windows_data.sort_by(|a, b| a.id.cmp(&b.id));
 
     save_app_state(windows_data)?;
     println!("Window state saved successfully");
@@ -233,7 +241,12 @@ fn save_window_state_sync(app: &tauri::AppHandle) -> Result<(), String> {
     // Get metadata
     let metadata = WINDOW_METADATA.lock().unwrap();
 
-    for (label, window) in app.webview_windows().iter() {
+    // Sort windows by label to ensure consistent order
+    let webview_windows = app.webview_windows();
+    let mut windows: Vec<_> = webview_windows.iter().collect();
+    windows.sort_by_key(|(label, _)| label.as_str());
+
+    for (label, window) in windows {
         // Skip color picker window
         if label.as_str() == "color-picker" {
             continue;
@@ -291,6 +304,9 @@ fn save_window_state_sync(app: &tauri::AppHandle) -> Result<(), String> {
         println!("Saved window {}: position=({}, {}), size=({}x{}), color={}, mode={}, path={}",
                  label, x, y, width, height, background_color, mode, file_path_str);
     }
+
+    // Sort windows_data by id to ensure consistent order in state.json
+    windows_data.sort_by(|a, b| a.id.cmp(&b.id));
 
     save_app_state(windows_data)?;
     println!("Window state saved successfully (sync)");
@@ -699,7 +715,7 @@ fn restore_window(app: &tauri::AppHandle, sticker_data: StickerData) {
     {
         let mut metadata = WINDOW_METADATA.lock().unwrap();
         metadata.insert(sticker_data.id.clone(), sticker_data.clone());
-        println!("Populated metadata for window {}: color={}", sticker_data.id, sticker_data.background_color);
+        println!("Populated metadata for window {}: color={}, mode={}", sticker_data.id, sticker_data.background_color, sticker_data.mode);
     }
 
     match WebviewWindowBuilder::new(

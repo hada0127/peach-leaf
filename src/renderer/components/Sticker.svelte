@@ -105,16 +105,13 @@
     // Update backend metadata with new mode and save state
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      const currentWindow = getCurrentWindow();
-      const windowLabel = currentWindow.label;
 
       await invoke('update_window_metadata', {
-        windowLabel: windowLabel,
+        windowLabel: data.id,
         backgroundColor: null,
         mode: mode
       });
-      console.log(`[${windowLabel}] Updated backend metadata with mode:`, mode);
+      console.log(`[${data.id}] Updated backend metadata with mode:`, mode);
 
       // Save window state immediately after mode change
       await saveWindowState();
@@ -275,15 +272,10 @@
     console.log('openColorPicker called');
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      const { getCurrentWindow } = await import('@tauri-apps/api/window');
-
-      const currentWindow = getCurrentWindow();
-      const windowLabel = currentWindow.label;
-
-      console.log('Opening color picker for window:', windowLabel, 'with color:', backgroundColor);
+      console.log('Opening color picker for window:', data.id, 'with color:', backgroundColor);
 
       await invoke('open_color_picker', {
-        parentLabel: windowLabel,
+        parentLabel: data.id,
         currentColor: backgroundColor
       });
 
@@ -474,58 +466,58 @@
     // Props로 받은 배경색 적용
     if (data.backgroundColor) {
       backgroundColor = data.backgroundColor;
-      console.log(`[${windowLabel}] Applied backgroundColor from props:`, data.backgroundColor);
+      console.log(`[${data.id}] Applied backgroundColor from props:`, data.backgroundColor);
     }
 
     // 윈도우별 컬러 선택 이벤트 리스닝
-    unlistenColorSelected = await listen(`color-selected-${windowLabel}`, async (event: any) => {
+    unlistenColorSelected = await listen(`color-selected-${data.id}`, async (event: any) => {
       const eventData = event.payload;
-      console.log(`[${windowLabel}] Color event received:`, eventData);
+      console.log(`[${data.id}] Color event received:`, eventData);
 
       backgroundColor = eventData.color;
-      console.log(`[${windowLabel}] Color applied:`, eventData.color);
+      console.log(`[${data.id}] Color applied:`, eventData.color);
 
       // Update backend metadata with new color and save state
       try {
         const { invoke } = await import('@tauri-apps/api/core');
         await invoke('update_window_metadata', {
-          windowLabel: windowLabel,
+          windowLabel: data.id,
           backgroundColor: eventData.color,
           mode: null
         });
-        console.log(`[${windowLabel}] Updated backend metadata with color:`, eventData.color);
+        console.log(`[${data.id}] Updated backend metadata with color:`, eventData.color);
 
         // Save window state immediately after color change
         await saveWindowState();
       } catch (error) {
-        console.error(`[${windowLabel}] Failed to update window metadata:`, error);
+        console.error(`[${data.id}] Failed to update window metadata:`, error);
       }
     });
 
-    console.log(`[${data.id}] Listening for close_note_${windowLabel}`);
-    console.log(`[${data.id}] Listening for open_color_picker_${windowLabel}`);
-    console.log(`[${data.id}] Listening for color-selected-${windowLabel}`);
+    console.log(`[${data.id}] Listening for close_note_${data.id}`);
+    console.log(`[${data.id}] Listening for open_color_picker_${data.id}`);
+    console.log(`[${data.id}] Listening for color-selected-${data.id}`);
 
-    unlistenCloseNote = await listen(`close_note_${windowLabel}`, () => {
+    unlistenCloseNote = await listen(`close_note_${data.id}`, () => {
       console.log(`[${data.id}] Received close_note event for this window`);
       handleClose();
     });
 
     // 색상 선택기 열기 이벤트 리스닝 (백엔드에서 포커스된 윈도우에만 전송)
-    unlistenOpenColorPicker = await listen(`open_color_picker_${windowLabel}`, () => {
+    unlistenOpenColorPicker = await listen(`open_color_picker_${data.id}`, () => {
       console.log(`[${data.id}] Received open_color_picker event for this window`);
       openColorPicker();
     });
 
     // Listen for window resize events
     unlistenResized = await currentWindow.onResized(async () => {
-      console.log(`[${windowLabel}] Window resized, saving state...`);
+      console.log(`[${data.id}] Window resized, saving state...`);
       await saveWindowState();
     });
 
     // Listen for window move events
     unlistenMoved = await currentWindow.onMoved(async () => {
-      console.log(`[${windowLabel}] Window moved, saving state...`);
+      console.log(`[${data.id}] Window moved, saving state...`);
       await saveWindowState();
     });
   });

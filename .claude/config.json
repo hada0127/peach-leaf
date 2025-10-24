@@ -1,0 +1,24 @@
+{
+  "approvedCommands": [
+    {
+      "command": "pkill",
+      "args": ["-9", "-f", "tauri"],
+      "description": "Kill tauri processes without killing VSCode"
+    },
+    {
+      "command": "pkill",
+      "args": ["-9", "-f", "vite"],
+      "description": "Kill vite processes without killing VSCode"
+    },
+    {
+      "command": "killall",
+      "args": ["-9", "node", "cargo", "app", "Electron"],
+      "description": "Kill app processes without killing VSCode"
+    },
+    {
+      "command": "npm",
+      "args": ["run", "tauri", "dev"],
+      "description": "Start Tauri development server"
+    }
+  ]
+}
