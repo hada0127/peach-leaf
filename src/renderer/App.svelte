@@ -29,36 +29,41 @@
     windowLabel = currentWindow.label;
     isColorPicker = windowLabel === 'color-picker';
 
-    console.log('App.svelte mounted. Window label:', windowLabel, 'isColorPicker:', isColorPicker);
+    console.log('[App.svelte] Mounted. Window label:', windowLabel, 'isColorPicker:', isColorPicker);
 
-    // Listen for init-sticker event to restore saved window data (BEFORE setting isInitialized)
+    // Try to fetch saved window data from backend
     if (!isColorPicker) {
-      await listen('init-sticker', (event: any) => {
-        const data = event.payload;
-        console.log('[App.svelte] Received init-sticker event:', data);
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const savedData = await invoke('get_window_data', { windowLabel });
 
-        stickerData = {
-          id: data.id,
-          filePath: data.file_path,
-          x: data.x,
-          y: data.y,
-          width: data.width,
-          height: data.height,
-          backgroundColor: data.background_color,
-          textColor: data.text_color,
-          mode: data.mode
-        };
+        if (savedData) {
+          console.log('[App.svelte] Found saved data for window:', windowLabel, savedData);
 
-        console.log('[App.svelte] Updated stickerData:', stickerData);
-      });
+          stickerData = {
+            id: savedData.id,
+            filePath: savedData.file_path,
+            x: savedData.x,
+            y: savedData.y,
+            width: savedData.width,
+            height: savedData.height,
+            backgroundColor: savedData.background_color,
+            textColor: savedData.text_color,
+            mode: savedData.mode
+          };
 
-      // For new windows (not restored), update the filePath to use permanent directory
-      if (stickerData.filePath.startsWith('/tmp/')) {
-        const timestamp = Date.now();
-        const newId = windowLabel === 'main' ? 'main' : `note-${timestamp}`;
-        stickerData.filePath = `/Users/tarucy/.peach-leaf/notes/${newId}.md`;
-        stickerData.id = newId;
-        console.log('[App.svelte] Updated new window file path to:', stickerData.filePath);
+          console.log('[App.svelte] Restored stickerData:', stickerData);
+        } else {
+          console.log('[App.svelte] No saved data found, using default');
+          // For new windows, update the filePath to use permanent directory
+          const timestamp = Date.now();
+          const newId = windowLabel === 'main' ? 'main' : `note-${timestamp}`;
+          stickerData.filePath = `/Users/tarucy/.peach-leaf/notes/${newId}.md`;
+          stickerData.id = newId;
+          console.log('[App.svelte] Created new window with file path:', stickerData.filePath);
+        }
+      } catch (error) {
+        console.error('[App.svelte] Failed to fetch window data:', error);
       }
     }
 

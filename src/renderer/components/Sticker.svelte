@@ -35,6 +35,19 @@
   let isProcessingMenuEvent = false;
   let pressedKeys = new Set<string>();
 
+  // Watch for props changes and update local state
+  $effect(() => {
+    console.log('[Sticker] Props changed:', data);
+    backgroundColor = data.backgroundColor;
+    textColor = data.textColor;
+    mode = data.mode;
+    // Reload file when filePath changes
+    if (data.filePath) {
+      console.log('[Sticker] File path changed to:', data.filePath);
+      loadFile();
+    }
+  });
+
   async function loadFile() {
     if (!window.electron) {
       // For testing without Electron

@@ -139,6 +139,14 @@ async fn get_saved_state() -> Result<AppState, String> {
     load_app_state()
 }
 
+#[tauri::command]
+async fn get_window_data(window_label: String) -> Result<Option<StickerData>, String> {
+    let state = load_app_state()?;
+    let window_data = state.windows.into_iter().find(|w| w.id == window_label);
+    println!("get_window_data called for '{}': found = {}", window_label, window_data.is_some());
+    Ok(window_data)
+}
+
 // Store for window metadata (background colors, etc.)
 use std::collections::HashMap;
 static WINDOW_METADATA: once_cell::sync::Lazy<Arc<Mutex<HashMap<String, StickerData>>>> =
@@ -378,6 +386,7 @@ pub fn run() {
             apply_color,
             save_window_state,
             get_saved_state,
+            get_window_data,
             update_window_metadata
         ])
         .setup(|app| {
