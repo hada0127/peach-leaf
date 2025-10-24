@@ -89,6 +89,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    pointer-events: auto;
+    position: relative;
   }
 
   .btn svg {

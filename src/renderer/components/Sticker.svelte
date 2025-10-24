@@ -23,17 +23,18 @@
   let backgroundColor = $state(data.backgroundColor);
   let textColor = $state(data.textColor);
   let fontSize = $state(11); // Default font size
-  let isDragging = $state(false);
-  let dragStartX = $state(0);
-  let dragStartY = $state(0);
-  let windowX = $state(0);
-  let windowY = $state(0);
-  let scaleFactor = $state(1);
   let editorView: EditorView | null = null;
   let saveTimeout: number | null = null;
   let lastMenuEventTime = 0;
   let isProcessingMenuEvent = false;
   let pressedKeys = new Set<string>();
+
+  // Drag state
+  let isDragging = $state(false);
+  let dragStartX = $state(0);
+  let dragStartY = $state(0);
+  let initialWindowX = $state(0);
+  let initialWindowY = $state(0);
 
   // Watch for props changes and update local state
   $effect(() => {
@@ -179,62 +180,49 @@
     }
   }
 
+  // Drag functions
   async function startDrag(e: MouseEvent) {
-    // 버튼 클릭은 드래그로 처리하지 않음
-    const isButton = (e.target as HTMLElement).closest('button');
-    if (isButton) {
-      return;
-    }
-
     const toolbar = (e.target as HTMLElement).closest('.toolbar');
     if (toolbar) {
-      // 현재 윈도우 위치 가져오기
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       const currentWindow = getCurrentWindow();
       const position = await currentWindow.outerPosition();
+      const scaleFactor = await currentWindow.scaleFactor();
 
-      // Retina 디스플레이를 위한 scale factor 가져오기
-      scaleFactor = await currentWindow.scaleFactor();
-      windowX = position.x;
-      windowY = position.y;
+      initialWindowX = position.x / scaleFactor;
+      initialWindowY = position.y / scaleFactor;
 
       isDragging = true;
       dragStartX = e.screenX;
       dragStartY = e.screenY;
-      e.preventDefault();
     }
   }
 
   function handleDrag(e: MouseEvent) {
     if (isDragging && e.screenX !== 0 && e.screenY !== 0) {
-      // screenX/screenY는 논리적 픽셀이므로 scaleFactor를 곱해 물리적 픽셀로 변환
-      const deltaX = (e.screenX - dragStartX) * scaleFactor;
-      const deltaY = (e.screenY - dragStartY) * scaleFactor;
+      const deltaX = e.screenX - dragStartX;
+      const deltaY = e.screenY - dragStartY;
 
-      windowX += deltaX;
-      windowY += deltaY;
+      const newX = initialWindowX + deltaX;
+      const newY = initialWindowY + deltaY;
 
-      dragStartX = e.screenX;
-      dragStartY = e.screenY;
-
-      // 비동기로 윈도우 위치 업데이트 (await 하지 않아 부드러운 드래그)
-      updateWindowPosition(windowX, windowY);
+      updateWindowPosition(newX, newY);
     }
   }
 
-  async function updateWindowPosition(x: number, y: number) {
-    try {
-      const { getCurrentWindow, PhysicalPosition } = await import('@tauri-apps/api/window');
-      const currentWindow = getCurrentWindow();
-      const newPosition = new PhysicalPosition(Math.round(x), Math.round(y));
-      await currentWindow.setPosition(newPosition);
-    } catch (error) {
-      console.error('Failed to update window position:', error);
-    }
+  async function updateWindowPosition(logicalX: number, logicalY: number) {
+    const { getCurrentWindow, LogicalPosition } = await import('@tauri-apps/api/window');
+    const currentWindow = getCurrentWindow();
+    const newPosition = new LogicalPosition(logicalX, logicalY);
+    await currentWindow.setPosition(newPosition);
   }
 
   function stopDrag() {
-    isDragging = false;
+    if (isDragging) {
+      isDragging = false;
+      // Save window state after drag ends
+      saveWindowState();
+    }
   }
 
   function handleKeydown(e: KeyboardEvent) {
@@ -450,10 +438,10 @@
 
   onMount(async () => {
     loadFile();
-    document.addEventListener('mousemove', handleDrag);
-    document.addEventListener('mouseup', stopDrag);
     window.addEventListener('keydown', handleKeydown);
     window.addEventListener('keyup', handleKeyup);
+    document.addEventListener('mousemove', handleDrag);
+    document.addEventListener('mouseup', stopDrag);
 
     // Tauri 메뉴 이벤트 리스닝
     unlistenMenu = await listen('menu', (event) => {
@@ -528,10 +516,10 @@
   });
 
   onDestroy(() => {
-    document.removeEventListener('mousemove', handleDrag);
-    document.removeEventListener('mouseup', stopDrag);
     window.removeEventListener('keydown', handleKeydown);
     window.removeEventListener('keyup', handleKeyup);
+    document.removeEventListener('mousemove', handleDrag);
+    document.removeEventListener('mouseup', stopDrag);
     if (unlistenMenu) unlistenMenu();
     if (unlistenColorSelected) unlistenColorSelected();
     if (unlistenCloseNote) unlistenCloseNote();
