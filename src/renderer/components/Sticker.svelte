@@ -217,7 +217,7 @@
 
       // 빈 파일 생성
       await invoke('write_file', {
-        file_path: tempFilePath,
+        filePath: tempFilePath,  // camelCase for Tauri auto-conversion
         content: '# New Note\n\n'
       });
 
