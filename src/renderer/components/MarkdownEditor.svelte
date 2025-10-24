@@ -84,6 +84,20 @@
     };
   });
 
+  // Update editor content when prop changes
+  $effect(() => {
+    if (editorView && content !== editorView.state.doc.toString()) {
+      const transaction = editorView.state.update({
+        changes: {
+          from: 0,
+          to: editorView.state.doc.length,
+          insert: content
+        }
+      });
+      editorView.dispatch(transaction);
+    }
+  });
+
   // Note: textColor and fontSize changes require component re-mount
   // This is handled automatically by {#key mode} in parent component
 </script>

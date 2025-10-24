@@ -69,8 +69,14 @@ fn load_app_state() -> Result<AppState, String> {
 
 #[tauri::command]
 async fn read_file(file_path: String) -> Result<String, String> {
-    fs::read_to_string(&file_path)
-        .map_err(|e| e.to_string())
+    println!("read_file called: {}", file_path);
+    let result = fs::read_to_string(&file_path)
+        .map_err(|e| e.to_string());
+    match &result {
+        Ok(content) => println!("read_file success: {} bytes", content.len()),
+        Err(e) => println!("read_file error: {}", e),
+    }
+    result
 }
 
 #[tauri::command]
