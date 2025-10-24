@@ -1,0 +1,72 @@
+{
+  "name": "peach-leaf",
+  "version": "1.0.0",
+  "description": "Cross-platform markdown sticky notes app",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "dev": "tauri dev",
+    "dev:renderer": "vite",
+    "build": "tauri build",
+    "build:renderer": "vite build",
+    "tauri": "tauri"
+  },
+  "keywords": [
+    "markdown",
+    "sticky-notes",
+    "electron"
+  ],
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^4.0.0",
+    "@tauri-apps/cli": "^2.9.1",
+    "@tsconfig/svelte": "^5.0.2",
+    "@types/node": "^20.11.0",
+    "concurrently": "^8.2.2",
+    "svelte": "^5.0.0",
+    "svelte-check": "^4.0.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.4.0"
+  },
+  "dependencies": {
+    "@codemirror/lang-markdown": "^6.2.4",
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/theme-one-dark": "^6.1.2",
+    "@codemirror/view": "^6.38.6",
+    "@tauri-apps/api": "^2.9.0",
+    "codemirror": "^6.0.1",
+    "electron-store": "^8.1.0",
+    "marked": "^11.1.1"
+  },
+  "build": {
+    "appId": "com.peachleaf.app",
+    "productName": "PeachLeaf",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility"
+    }
+  }
+}

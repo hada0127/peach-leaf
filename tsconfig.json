@@ -1,0 +1,15 @@
+{
+  "extends": "@tsconfig/svelte/tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "checkJs": true,
+    "isolatedModules": true,
+    "types": ["svelte"]
+  },
+  "include": ["src/renderer/**/*", "src/renderer/svelte5-runes.d.ts"],
+  "exclude": ["node_modules", "dist"]
+}
