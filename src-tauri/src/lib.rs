@@ -166,8 +166,11 @@ async fn apply_color(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    use tauri::RunEvent;
+
     tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             read_file,
             write_file,
@@ -187,6 +190,15 @@ pub fn run() {
                 let menu_id = event.id().as_ref();
                 println!("Menu clicked: {}", menu_id);
 
+                // If new_note is clicked and there are no windows, create one
+                if menu_id == "new_note" && app.webview_windows().is_empty() {
+                    println!("No windows exist, creating main window");
+                    if let Err(e) = create_main_window(app) {
+                        eprintln!("Failed to create main window: {}", e);
+                    }
+                    return;
+                }
+
                 // Emit event to the focused window
                 if let Some(focused_window) = app.webview_windows().values().find(|w| {
                     w.is_focused().unwrap_or(false)
@@ -204,8 +216,14 @@ pub fn run() {
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app_handle, event| {
+            // Prevent app from exiting when all windows are closed
+            if let RunEvent::ExitRequested { api, .. } = event {
+                api.prevent_exit();
+            }
+        });
 }
 
 fn create_menu(app: &tauri::App) -> Result<Menu<tauri::Wry>, tauri::Error> {
@@ -283,4 +301,24 @@ fn create_menu(app: &tauri::App) -> Result<Menu<tauri::Wry>, tauri::Error> {
         .build()?;
 
     Ok(menu)
+}
+
+fn create_main_window(app: &tauri::AppHandle) -> Result<(), tauri::Error> {
+    use tauri::WebviewWindowBuilder;
+    use tauri::WebviewUrl;
+
+    let window = WebviewWindowBuilder::new(
+        app,
+        "main",
+        WebviewUrl::default(),
+    )
+    .title("PeachLeaf")
+    .inner_size(400.0, 300.0)
+    .resizable(true)
+    .decorations(false)
+    .transparent(true)
+    .always_on_top(false)
+    .build()?;
+
+    Ok(())
 }

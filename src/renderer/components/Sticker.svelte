@@ -90,11 +90,30 @@
     }
   }
 
-  function handleClose() {
-    if (window.electron) {
-      window.electron.closeSticker(data.id);
-    } else {
-      console.log('Would close sticker');
+  async function handleClose() {
+    try {
+      // Check if there's content in the note
+      const trimmedContent = content.trim();
+
+      // If there's content, show confirmation dialog
+      if (trimmedContent.length > 0) {
+        const { confirm } = await import('@tauri-apps/plugin-dialog');
+        const shouldClose = await confirm('This note has content. Are you sure you want to close it?', {
+          title: 'Close Note',
+          kind: 'warning'
+        });
+
+        if (!shouldClose) {
+          return; // User cancelled, don't close
+        }
+      }
+
+      // Close the window
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      const currentWindow = getCurrentWindow();
+      await currentWindow.close();
+    } catch (error) {
+      console.error('Failed to close window:', error);
     }
   }
 
