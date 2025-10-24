@@ -29,13 +29,7 @@
   let isProcessingMenuEvent = false;
   let pressedKeys = new Set<string>();
 
-  // Drag state
-  let isDragging = $state(false);
-  let dragStartX = $state(0);
-  let dragStartY = $state(0);
-  let initialWindowX = $state(0);
-  let initialWindowY = $state(0);
-  let lastDragTime = 0;
+  // Drag state - 네이티브 드래그 사용으로 대부분 변수 불필요
 
 
   // Watch for props changes and update local state
@@ -175,61 +169,27 @@
     }
   }
 
-  // Drag functions
-  async function startDrag(e: MouseEvent) {
+  // Drag functions - Tauri 네이티브 드래그 사용
+  let isDragging = $state(false);
+
+  function startDrag(e: MouseEvent) {
     const toolbar = (e.target as HTMLElement).closest('.toolbar');
-    if (toolbar) {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      const currentWindow = getCurrentWindow();
-      const position = await currentWindow.outerPosition();
-      const scaleFactor = await currentWindow.scaleFactor();
-
-      // Store initial position in physical pixels
-      initialWindowX = position.x;
-      initialWindowY = position.y;
-
-      // Store initial mouse position (screenX/Y are in logical pixels, convert to physical)
+    if (toolbar && !isDragging) {
       isDragging = true;
-      dragStartX = e.screenX * scaleFactor;
-      dragStartY = e.screenY * scaleFactor;
-      lastDragTime = Date.now();
-    }
-  }
+      console.log('[Sticker] Starting native drag');
 
-  async function handleDrag(e: MouseEvent) {
-    if (isDragging && e.screenX !== 0 && e.screenY !== 0) {
-      const { getCurrentWindow, PhysicalPosition } = await import('@tauri-apps/api/window');
-      const currentWindow = getCurrentWindow();
-      const scaleFactor = await currentWindow.scaleFactor();
-
-      // Convert logical pixels to physical pixels
-      const currentMouseX = e.screenX * scaleFactor;
-      const currentMouseY = e.screenY * scaleFactor;
-
-      // Calculate delta in physical pixels
-      const deltaX = currentMouseX - dragStartX;
-      const deltaY = currentMouseY - dragStartY;
-
-      // Calculate new position in physical pixels
-      const newX = initialWindowX + deltaX;
-      const newY = initialWindowY + deltaY;
-
-      const newPosition = new PhysicalPosition(newX, newY);
-      await currentWindow.setPosition(newPosition);
-
-      lastDragTime = Date.now();
-    }
-  }
-
-  function stopDrag() {
-    if (isDragging) {
-      isDragging = false;
-      // Debounced save - only save after drag has been idle for 100ms
-      setTimeout(() => {
-        if (!isDragging && Date.now() - lastDragTime > 100) {
+      // startDragging은 동기적으로 호출되어야 함
+      import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
+        const currentWindow = getCurrentWindow();
+        currentWindow.startDragging().then(() => {
+          console.log('[Sticker] Drag completed');
+          isDragging = false;
           saveWindowState();
-        }
-      }, 100);
+        }).catch((error) => {
+          console.error('[Sticker] Failed to start dragging:', error);
+          isDragging = false;
+        });
+      });
     }
   }
 
@@ -448,8 +408,6 @@
     loadFile();
     window.addEventListener('keydown', handleKeydown);
     window.addEventListener('keyup', handleKeyup);
-    document.addEventListener('mousemove', handleDrag);
-    document.addEventListener('mouseup', stopDrag);
 
     // Tauri 메뉴 이벤트 리스닝
     unlistenMenu = await listen('menu', (event) => {
@@ -528,8 +486,6 @@
   onDestroy(() => {
     window.removeEventListener('keydown', handleKeydown);
     window.removeEventListener('keyup', handleKeyup);
-    document.removeEventListener('mousemove', handleDrag);
-    document.removeEventListener('mouseup', stopDrag);
     if (unlistenMenu) unlistenMenu();
     if (unlistenColorSelected) unlistenColorSelected();
     if (unlistenCloseNote) unlistenCloseNote();
