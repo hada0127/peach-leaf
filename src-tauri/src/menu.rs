@@ -125,7 +125,6 @@ pub fn update_font_menu_checks(font_size: u32) {
 
 pub fn setup_menu_handler(app: &tauri::AppHandle) {
     use crate::window_manager::create_new_note_backend;
-    use crate::commands::window::WINDOW_METADATA;
 
     // Handle menu events with debouncing
     let last_menu_event: Arc<Mutex<Option<(String, Instant)>>> = Arc::new(Mutex::new(None));
