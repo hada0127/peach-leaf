@@ -40,18 +40,25 @@
     textColor = data.textColor;
     mode = data.mode;
     fontSize = data.fontSize || 14;
-    // Reload file when filePath changes
-    if (data.filePath) {
-      console.log('[Sticker] File path changed to:', data.filePath);
+  });
+
+  // Separate effect to watch file path changes
+  $effect(() => {
+    const filePath = data.filePath;
+    console.log('[Sticker] File path effect triggered, filePath:', filePath);
+    if (filePath && filePath !== '/tmp/test.md') {
+      console.log('[Sticker] Loading file:', filePath);
       loadFile();
     }
   });
 
   async function loadFile() {
+    console.log('[Sticker] loadFile called, filePath:', data.filePath);
     try {
       const { invoke } = await import('@tauri-apps/api/core');
       const fileContent = await invoke('read_file', { filePath: data.filePath });
       content = fileContent as string;
+      console.log('[Sticker] File loaded successfully, content length:', content.length);
     } catch (error) {
       console.error('[Sticker] Failed to load file:', error);
       content = '';
@@ -429,7 +436,8 @@
   let unlistenMoved: (() => void) | null = null;
 
   onMount(async () => {
-    loadFile();
+    // Don't call loadFile() here - let $effect handle it when data.filePath is set
+    console.log('[Sticker] onMount - data.filePath:', data.filePath);
     window.addEventListener('keydown', handleKeydown);
     window.addEventListener('keyup', handleKeyup);
 

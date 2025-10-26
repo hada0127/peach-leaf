@@ -39,20 +39,25 @@
 
         if (savedData) {
           console.log('[App.svelte] Found saved data for window:', windowLabel, savedData);
+          console.log('[App.svelte] savedData.filePath:', savedData.filePath);
+          console.log('[App.svelte] savedData.fontSize:', savedData.fontSize);
 
           stickerData = {
             id: savedData.id,
-            filePath: savedData.file_path,
+            filePath: savedData.filePath,
             x: savedData.x,
             y: savedData.y,
             width: savedData.width,
             height: savedData.height,
-            backgroundColor: savedData.background_color,
-            textColor: savedData.text_color,
-            mode: savedData.mode
+            backgroundColor: savedData.backgroundColor,
+            textColor: savedData.textColor,
+            mode: savedData.mode,
+            fontSize: savedData.fontSize || 14
           };
 
           console.log('[App.svelte] Restored stickerData:', stickerData);
+          console.log('[App.svelte] stickerData.filePath:', stickerData.filePath);
+          console.log('[App.svelte] stickerData.fontSize:', stickerData.fontSize);
         } else {
           console.log('[App.svelte] No saved data found, using default');
           // For new windows, update the filePath to use permanent directory

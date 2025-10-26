@@ -35,14 +35,23 @@ pub fn save_app_state(windows: Vec<StickerData>) -> Result<(), String> {
 
 pub fn load_app_state() -> Result<AppState, String> {
     let state_path = get_state_file_path();
+
     if !state_path.exists() {
-        println!("No saved state found");
+        println!("No saved state found at {:?}", state_path);
         return Ok(AppState { windows: vec![] });
     }
 
-    let json = fs::read_to_string(&state_path).map_err(|e| e.to_string())?;
-    let state: AppState = serde_json::from_str(&json).map_err(|e| e.to_string())?;
-    println!("App state loaded from: {:?}", state_path);
+    let json = fs::read_to_string(&state_path).map_err(|e| {
+        eprintln!("Failed to read state file: {}", e);
+        e.to_string()
+    })?;
+
+    let state: AppState = serde_json::from_str(&json).map_err(|e| {
+        eprintln!("Failed to parse state JSON: {}", e);
+        e.to_string()
+    })?;
+
+    println!("App state loaded from: {:?} ({} windows)", state_path, state.windows.len());
     Ok(state)
 }
 

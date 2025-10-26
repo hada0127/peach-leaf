@@ -11,6 +11,7 @@ export interface StickerData {
   backgroundColor: string;
   textColor: string;
   mode: 'edit' | 'preview';
+  fontSize?: number;
 }
 
 export const tauriAPI = {
