@@ -103,6 +103,22 @@
     font-weight: bold;
   }
 
+  /* Table column alignment - marked library adds these styles */
+  .preview :global(th[align="left"]),
+  .preview :global(td[align="left"]) {
+    text-align: left;
+  }
+
+  .preview :global(th[align="center"]),
+  .preview :global(td[align="center"]) {
+    text-align: center;
+  }
+
+  .preview :global(th[align="right"]),
+  .preview :global(td[align="right"]) {
+    text-align: right;
+  }
+
   .preview :global(img) {
     max-width: 100%;
     height: auto;
