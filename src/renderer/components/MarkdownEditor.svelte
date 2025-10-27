@@ -134,65 +134,68 @@
             console.log('[MarkdownEditor] CodeMirror paste handler triggered!');
             return handleImagePaste(event, view);
           },
-          keydown: async (event, view) => {
+          keydown: (event, view) => {
             // Detect Cmd+V or Ctrl+V
             if ((event.metaKey || event.ctrlKey) && event.key === 'v') {
-              event.preventDefault(); // Always prevent default, we'll handle it ourselves
+              event.preventDefault(); // Prevent default paste
 
               if (!filePath) {
                 return true;
               }
 
-              // Try to read image from clipboard using native Tauri API (no permission popup!)
-              try {
-                const { invoke } = await import('@tauri-apps/api/core');
-                const relativePath = await invoke<string | null>('read_clipboard_image', {
-                  notePath: filePath
-                });
-
-                if (relativePath) {
-                  // Image was found and saved
-                  console.log('[MarkdownEditor] Image pasted from clipboard:', relativePath);
-
-                  const cursor = view.state.selection.main.head;
-                  const imageMarkdown = `![image](${relativePath})`;
-
-                  view.dispatch({
-                    changes: {
-                      from: cursor,
-                      insert: imageMarkdown
-                    },
-                    selection: { anchor: cursor + imageMarkdown.length }
+              // Handle paste asynchronously without blocking
+              (async () => {
+                // Try to read image from clipboard using native Tauri API (no permission popup!)
+                try {
+                  const { invoke } = await import('@tauri-apps/api/core');
+                  const relativePath = await invoke<string | null>('read_clipboard_image', {
+                    notePath: filePath
                   });
 
-                  return true;
+                  if (relativePath) {
+                    // Image was found and saved
+                    console.log('[MarkdownEditor] Image pasted from clipboard:', relativePath);
+
+                    const cursor = view.state.selection.main.head;
+                    const imageMarkdown = `![image](${relativePath})`;
+
+                    view.dispatch({
+                      changes: {
+                        from: cursor,
+                        insert: imageMarkdown
+                      },
+                      selection: { anchor: cursor + imageMarkdown.length }
+                    });
+
+                    return;
+                  }
+                } catch (error) {
+                  console.error('[MarkdownEditor] Native clipboard read failed:', error);
                 }
-              } catch (error) {
-                console.error('[MarkdownEditor] Native clipboard read failed:', error);
-              }
 
-              // No image found, paste text using clipboard-manager plugin
-              try {
-                const { readText } = await import('@tauri-apps/plugin-clipboard-manager');
-                const text = await readText();
+                // No image found, paste text using clipboard-manager plugin
+                try {
+                  const { readText } = await import('@tauri-apps/plugin-clipboard-manager');
+                  const text = await readText();
 
-                if (text) {
-                  const selection = view.state.selection.main;
-                  const from = selection.from;
-                  const to = selection.to;
+                  if (text) {
+                    const selection = view.state.selection.main;
+                    const from = selection.from;
+                    const to = selection.to;
 
-                  view.dispatch({
-                    changes: { from, to, insert: text },
-                    selection: { anchor: from + text.length }
-                  });
+                    view.dispatch({
+                      changes: { from, to, insert: text },
+                      selection: { anchor: from + text.length }
+                    });
 
-                  console.log('[MarkdownEditor] Text pasted from clipboard');
+                    console.log('[MarkdownEditor] Text pasted from clipboard');
+                  }
+                } catch (error) {
+                  console.error('[MarkdownEditor] Failed to paste text:', error);
                 }
-              } catch (error) {
-                console.error('[MarkdownEditor] Failed to paste text:', error);
-              }
+              })();
 
-              return true;
+              return true; // We handled it
             }
 
             return false; // Don't prevent default for other keys
