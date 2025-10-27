@@ -1,16 +1,93 @@
 <script lang="ts">
   import { marked } from 'marked';
+  import { invoke } from '@tauri-apps/api/core';
 
   interface Props {
     content: string;
     textColor: string;
     fontSize?: number;
+    filePath?: string;
   }
 
-  let { content, textColor, fontSize = 11 }: Props = $props();
+  let { content, textColor, fontSize = 11, filePath = '' }: Props = $props();
+
+  // Cache for loaded image data URLs
+  let imageCache = $state<Map<string, string>>(new Map());
+  let cacheVersion = $state(0); // Used to trigger re-renders
+
+  // Load images asynchronously and cache them as data URLs
+  $effect(() => {
+    if (!content || !filePath) return;
+
+    const imageRegex = /!\[.*?\]\((\.\/[^)]+)\)/g;
+    const matches = Array.from(content.matchAll(imageRegex));
+    const imagePaths = matches.map(m => m[1]);
+
+    if (imagePaths.length === 0) return;
+
+    const noteDir = filePath.substring(0, filePath.lastIndexOf('/'));
+
+    // Load images in parallel
+    Promise.all(
+      imagePaths.map(async (relativePath) => {
+        // Skip if already cached
+        if (imageCache.has(relativePath)) return;
+
+        try {
+          // Convert relative path to absolute
+          const absolutePath = `${noteDir}/${relativePath.substring(2)}`;
+
+          // Call Tauri command to get data URL
+          const dataUrl = await invoke<string>('read_image_as_data_url', {
+            imagePath: absolutePath
+          });
+
+          console.log('[MarkdownPreview] Loaded image:', relativePath);
+
+          // Cache the data URL
+          imageCache.set(relativePath, dataUrl);
+        } catch (error) {
+          console.error('[MarkdownPreview] Failed to load image:', relativePath, error);
+        }
+      })
+    ).then(() => {
+      // Trigger re-render by updating cache version
+      cacheVersion++;
+    });
+  });
 
   // Svelte 5: Use $derived for computed values
-  let html = $derived(marked(content, { breaks: true, gfm: true }));
+  let html = $derived.by(() => {
+    // Access cacheVersion to trigger re-render when images are loaded
+    const _ = cacheVersion;
+
+    // Custom renderer to use cached data URLs
+    const renderer = new marked.Renderer();
+    const originalImage = renderer.image.bind(renderer);
+
+    renderer.image = (args) => {
+      const href = typeof args === 'object' ? args.href : args;
+      const title = typeof args === 'object' ? args.title : '';
+      const text = typeof args === 'object' ? args.text : '';
+
+      // If it's a relative path starting with ./ and we have it cached
+      if (href && href.startsWith('./')) {
+        const cachedDataUrl = imageCache.get(href);
+
+        if (cachedDataUrl) {
+          return `<img src="${cachedDataUrl}" alt="${text}" title="${title || ''}" />`;
+        } else {
+          // Show placeholder while loading
+          return `<img src="" alt="${text}" title="${title || ''}" style="display:none;" />`;
+        }
+      }
+
+      // For other images (http/https), use original renderer
+      return originalImage({ href, title, text });
+    };
+
+    return marked(content, { breaks: true, gfm: true, renderer });
+  });
 </script>
 
 <div class="preview" style="color: {textColor}; font-size: {fontSize}px;">

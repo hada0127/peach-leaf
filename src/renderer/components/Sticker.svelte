@@ -93,8 +93,50 @@
     }
   }
 
+  let previousImages: string[] = [];
+
+  function extractImagePaths(markdownContent: string): string[] {
+    // Extract image paths from markdown: ![alt](path)
+    const imageRegex = /!\[.*?\]\((\.\/[^)]+)\)/g;
+    const matches = markdownContent.matchAll(imageRegex);
+    return Array.from(matches, m => m[1]);
+  }
+
+  async function deleteRemovedImages(oldContent: string, newContent: string) {
+    const oldImages = extractImagePaths(oldContent);
+    const newImages = extractImagePaths(newContent);
+
+    // Find images that were removed
+    const removedImages = oldImages.filter(img => !newImages.includes(img));
+
+    if (removedImages.length > 0) {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        for (const imagePath of removedImages) {
+          await invoke('delete_image', {
+            notePath: data.filePath,
+            imagePath
+          });
+          console.log('[Sticker] Deleted image:', imagePath);
+        }
+
+        // Cleanup empty folders
+        await invoke('cleanup_note_images', {
+          notePath: data.filePath
+        });
+      } catch (error) {
+        console.error('[Sticker] Failed to delete images:', error);
+      }
+    }
+  }
+
   function handleContentChange(event: CustomEvent<string>) {
+    const oldContent = content;
     content = event.detail;
+
+    // Track image deletions
+    deleteRemovedImages(oldContent, content);
+
     saveFile();
   }
 
@@ -382,17 +424,22 @@
         try {
           const { readText } = await import('@tauri-apps/plugin-clipboard-manager');
           const text = await readText();
-          const selection = editorView.state.selection.main;
-          const from = selection.from;
-          const to = selection.to;
-          const insertLength = text.length;
 
-          editorView.dispatch({
-            changes: { from, to, insert: text },
-            selection: { anchor: from + insertLength }
-          });
+          if (text) {
+            const selection = editorView.state.selection.main;
+            const from = selection.from;
+            const to = selection.to;
+            const insertLength = text.length;
+
+            editorView.dispatch({
+              changes: { from, to, insert: text },
+              selection: { anchor: from + insertLength }
+            });
+          }
         } catch (error) {
-          console.error('Failed to paste:', error);
+          // Silently ignore - might be an image in clipboard
+          // Images are handled by MarkdownEditor's paste event handler
+          console.log('[Sticker] Paste from menu failed (might be an image):', error.message);
         }
         return;
       }
@@ -559,11 +606,12 @@
           {content}
           {textColor}
           {fontSize}
+          filePath={data.filePath}
           onchange={handleContentChange}
           oneditorready={(view) => { editorView = view; }}
         />
       {:else}
-        <MarkdownPreview {content} {textColor} {fontSize} />
+        <MarkdownPreview {content} {textColor} {fontSize} filePath={data.filePath} />
       {/if}
     {/key}
   </div>

@@ -28,7 +28,12 @@ pub fn run() {
             commands::window::get_saved_state,
             commands::window::get_window_data,
             commands::window::update_window_metadata,
-            commands::window::on_window_focus
+            commands::window::on_window_focus,
+            commands::image::save_pasted_image,
+            commands::image::delete_image,
+            commands::image::cleanup_note_images,
+            commands::image::read_clipboard_image,
+            commands::image::read_image_as_data_url
         ])
         .setup(|app| {
             // Create menu
