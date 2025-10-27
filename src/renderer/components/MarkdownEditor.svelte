@@ -552,6 +552,24 @@
           '.cm-scroller': {
             overflow: 'auto',
           },
+          '.cm-line .ͼe': {
+            borderBottom: 'none !important',
+          },
+          '.cm-line .ͼf': {
+            borderBottom: 'none !important',
+          },
+          '.cm-line .ͼg': {
+            borderBottom: 'none !important',
+          },
+          '.cm-line .ͼh': {
+            borderBottom: 'none !important',
+          },
+          '.cm-line .ͼi': {
+            borderBottom: 'none !important',
+          },
+          '.cm-line .ͼj': {
+            borderBottom: 'none !important',
+          },
         }),
       ],
     });
@@ -633,5 +651,43 @@
     border-radius: 4px;
     max-width: 100%;
     height: auto;
+  }
+
+  /* Remove underlines from headings */
+  :global(.cm-line) {
+    border-bottom: none !important;
+  }
+
+  :global(.cm-header-1),
+  :global(.cm-header-2),
+  :global(.cm-header-3),
+  :global(.cm-header-4),
+  :global(.cm-header-5),
+  :global(.cm-header-6) {
+    border-bottom: none !important;
+    text-decoration: none !important;
+  }
+
+  :global(.ͼe),
+  :global(.ͼf),
+  :global(.ͼg),
+  :global(.ͼh),
+  :global(.ͼi),
+  :global(.ͼj) {
+    border-bottom: none !important;
+    text-decoration: none !important;
+  }
+
+  /* CodeMirror heading classes - remove underline */
+  :global(.ͼ5),
+  :global(.ͼ6),
+  :global(.ͼ7),
+  :global(.ͼ8),
+  :global(.ͼ9),
+  :global(.ͼa),
+  :global(.ͼb),
+  :global(.ͼc),
+  :global(.ͼd) {
+    text-decoration: none !important;
   }
 </style>

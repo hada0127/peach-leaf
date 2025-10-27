@@ -115,18 +115,34 @@
     font-size: 1.8em;
     margin-top: 0.5em;
     margin-bottom: 0.5em;
-    border-bottom: 2px solid rgba(0, 0, 0, 0.1);
   }
 
   .preview :global(h2) {
     font-size: 1.5em;
     margin-top: 0.5em;
     margin-bottom: 0.5em;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
   }
 
   .preview :global(h3) {
     font-size: 1.3em;
+    margin-top: 0.5em;
+    margin-bottom: 0.5em;
+  }
+
+  .preview :global(h4) {
+    font-size: 1.1em;
+    margin-top: 0.5em;
+    margin-bottom: 0.5em;
+  }
+
+  .preview :global(h5) {
+    font-size: 1.0em;
+    margin-top: 0.5em;
+    margin-bottom: 0.5em;
+  }
+
+  .preview :global(h6) {
+    font-size: 0.9em;
     margin-top: 0.5em;
     margin-bottom: 0.5em;
   }
