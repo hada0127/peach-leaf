@@ -1,9 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { EditorView, keymap, lineNumbers, Decoration, type DecorationSet, ViewPlugin, type ViewUpdate, WidgetType } from '@codemirror/view';
-  import { EditorState, Compartment, type Range } from '@codemirror/state';
+  import { EditorState, Compartment, type Range, RangeSet } from '@codemirror/state';
   import { markdown } from '@codemirror/lang-markdown';
-  import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+  import { defaultKeymap, history, historyKeymap, deleteCharBackward } from '@codemirror/commands';
   import { highlightActiveLineGutter, highlightSpecialChars, drawSelection, dropCursor, highlightActiveLine } from '@codemirror/view';
   import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language';
 
@@ -26,7 +26,7 @@
   // Image cache for loaded images
   const imageCache = new Map<string, string>();
 
-  // Widget for displaying images
+  // Widget for displaying images inline
   class ImageWidget extends WidgetType {
     src: string;
     alt: string;
@@ -37,18 +37,28 @@
       this.alt = alt;
     }
 
+    eq(other: ImageWidget) {
+      return other.src === this.src && other.alt === this.alt;
+    }
+
     toDOM() {
       const wrap = document.createElement('span');
       wrap.className = 'cm-image-widget';
+      wrap.contentEditable = 'false'; // Make it uneditable
       const img = document.createElement('img');
       img.src = this.src;
       img.alt = this.alt;
       img.style.maxWidth = '100%';
       img.style.display = 'block';
-      img.style.margin = '4px 0';
+      img.style.margin = '8px 0';
       img.style.borderRadius = '4px';
+      img.style.cursor = 'default';
       wrap.appendChild(img);
       return wrap;
+    }
+
+    ignoreEvent() {
+      return true; // Don't allow events to pass through
     }
   }
 
@@ -112,8 +122,11 @@
       } else {
         console.log('[MarkdownEditor] Image cached, creating widget:', src);
         // Replace the markdown with an image widget
+        // Use atomic: true to make it deletable as a single unit
         const deco = Decoration.replace({
           widget: new ImageWidget(cachedDataUrl, alt),
+          inclusive: true,
+          block: false,
         });
         widgets.push(deco.range(from, to));
       }
@@ -134,8 +147,7 @@
       }
 
       update(update: ViewUpdate) {
-        // Always update decorations, even for empty transactions
-        // This is needed because images load asynchronously
+        // Always update decorations, including for transactions triggered by image loading
         console.log('[MarkdownEditor] ImagePlugin update, docChanged:', update.docChanged);
         this.decorations = createImageDecorations(update.view);
       }
@@ -144,6 +156,27 @@
       decorations: (v) => v.decorations,
     }
   );
+
+  // Create a simple marker class for atomic ranges
+  class AtomicMarker {
+    constructor() {}
+  }
+
+  // Provide atomic ranges separately for single-unit deletion
+  const imageAtomicRanges = EditorView.atomicRanges.of(view => {
+    const ranges: Range<AtomicMarker>[] = [];
+    const imageRegex = /!\[([^\]]*)\]\((\.\/[^)]+)\)/g;
+    const text = view.state.doc.toString();
+
+    let match;
+    while ((match = imageRegex.exec(text)) !== null) {
+      const from = match.index;
+      const to = from + match[0].length;
+      ranges.push({ from, to, value: new AtomicMarker() });
+    }
+
+    return ranges.length > 0 ? RangeSet.of(ranges, true) : RangeSet.empty;
+  });
 
   // Handle image paste
   function handleImagePaste(event: ClipboardEvent, view: EditorView): boolean {
@@ -235,6 +268,8 @@
   onMount(() => {
     if (!editorContainer) return;
 
+    console.log('[MarkdownEditor] onMount called, filePath:', filePath);
+
     const startState = EditorState.create({
       doc: content,
       extensions: [
@@ -252,6 +287,7 @@
         markdown(),
         EditorView.lineWrapping, // 자동 줄바꿈 활성화
         imagePlugin, // Add image widget plugin
+        imageAtomicRanges, // Make images deletable as single unit
         EditorView.domEventHandlers({
           paste: (event, view) => {
             console.log('[MarkdownEditor] CodeMirror paste handler triggered!');
