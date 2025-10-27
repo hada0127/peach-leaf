@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { EditorView, keymap, lineNumbers } from '@codemirror/view';
-  import { EditorState, Compartment } from '@codemirror/state';
+  import { EditorView, keymap, lineNumbers, Decoration, type DecorationSet, ViewPlugin, type ViewUpdate, WidgetType } from '@codemirror/view';
+  import { EditorState, Compartment, type Range } from '@codemirror/state';
   import { markdown } from '@codemirror/lang-markdown';
   import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
   import { highlightActiveLineGutter, highlightSpecialChars, drawSelection, dropCursor, highlightActiveLine } from '@codemirror/view';
@@ -22,6 +22,128 @@
 
   let editorContainer = $state<HTMLDivElement>();
   let editorView: EditorView | null = null;
+
+  // Image cache for loaded images
+  const imageCache = new Map<string, string>();
+
+  // Widget for displaying images
+  class ImageWidget extends WidgetType {
+    src: string;
+    alt: string;
+
+    constructor(src: string, alt: string) {
+      super();
+      this.src = src;
+      this.alt = alt;
+    }
+
+    toDOM() {
+      const wrap = document.createElement('span');
+      wrap.className = 'cm-image-widget';
+      const img = document.createElement('img');
+      img.src = this.src;
+      img.alt = this.alt;
+      img.style.maxWidth = '100%';
+      img.style.display = 'block';
+      img.style.margin = '4px 0';
+      img.style.borderRadius = '4px';
+      wrap.appendChild(img);
+      return wrap;
+    }
+  }
+
+  // Load image as data URL
+  async function loadImageAsDataUrl(relativePath: string): Promise<string | null> {
+    if (!filePath) return null;
+
+    // Check cache first
+    if (imageCache.has(relativePath)) {
+      return imageCache.get(relativePath)!;
+    }
+
+    try {
+      const noteDir = filePath.substring(0, filePath.lastIndexOf('/'));
+      const absolutePath = `${noteDir}/${relativePath.substring(2)}`;
+
+      const { invoke } = await import('@tauri-apps/api/core');
+      const dataUrl = await invoke<string>('read_image_as_data_url', {
+        imagePath: absolutePath
+      });
+
+      // Cache the result
+      imageCache.set(relativePath, dataUrl);
+      return dataUrl;
+    } catch (error) {
+      console.error('[MarkdownEditor] Failed to load image:', relativePath, error);
+      return null;
+    }
+  }
+
+  // Create decorations for images
+  function createImageDecorations(view: EditorView): DecorationSet {
+    const widgets: Range<Decoration>[] = [];
+    const imageRegex = /!\[([^\]]*)\]\((\.\/[^)]+)\)/g;
+    const text = view.state.doc.toString();
+
+    console.log('[MarkdownEditor] Creating image decorations, text length:', text.length);
+
+    let match;
+    let matchCount = 0;
+    while ((match = imageRegex.exec(text)) !== null) {
+      matchCount++;
+      const from = match.index;
+      const to = from + match[0].length;
+      const alt = match[1];
+      const src = match[2];
+
+      console.log('[MarkdownEditor] Found image:', { src, alt, from, to });
+
+      // Load image asynchronously if not cached
+      const cachedDataUrl = imageCache.get(src);
+      if (!cachedDataUrl) {
+        console.log('[MarkdownEditor] Image not cached, loading:', src);
+        loadImageAsDataUrl(src).then((dataUrl) => {
+          if (dataUrl) {
+            console.log('[MarkdownEditor] Image loaded, triggering update:', src);
+            // Trigger a full decoration rebuild by dispatching an empty transaction
+            view.dispatch({});
+          }
+        });
+      } else {
+        console.log('[MarkdownEditor] Image cached, creating widget:', src);
+        // Replace the markdown with an image widget
+        const deco = Decoration.replace({
+          widget: new ImageWidget(cachedDataUrl, alt),
+        });
+        widgets.push(deco.range(from, to));
+      }
+    }
+
+    console.log('[MarkdownEditor] Found', matchCount, 'images,', widgets.length, 'widgets created');
+    return Decoration.set(widgets);
+  }
+
+  // ViewPlugin to manage image decorations
+  const imagePlugin = ViewPlugin.fromClass(
+    class {
+      decorations: DecorationSet;
+
+      constructor(view: EditorView) {
+        console.log('[MarkdownEditor] ImagePlugin constructor');
+        this.decorations = createImageDecorations(view);
+      }
+
+      update(update: ViewUpdate) {
+        // Always update decorations, even for empty transactions
+        // This is needed because images load asynchronously
+        console.log('[MarkdownEditor] ImagePlugin update, docChanged:', update.docChanged);
+        this.decorations = createImageDecorations(update.view);
+      }
+    },
+    {
+      decorations: (v) => v.decorations,
+    }
+  );
 
   // Handle image paste
   function handleImagePaste(event: ClipboardEvent, view: EditorView): boolean {
@@ -129,6 +251,7 @@
         keymap.of([...defaultKeymap, ...historyKeymap]),
         markdown(),
         EditorView.lineWrapping, // 자동 줄바꿈 활성화
+        imagePlugin, // Add image widget plugin
         EditorView.domEventHandlers({
           paste: (event, view) => {
             console.log('[MarkdownEditor] CodeMirror paste handler triggered!');
