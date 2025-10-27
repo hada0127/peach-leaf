@@ -26,39 +26,187 @@
   // Image cache for loaded images
   const imageCache = new Map<string, string>();
 
-  // Widget for displaying images inline
+  // Store selected image info
+  let selectedImageElement: HTMLElement | null = null;
+  let selectedImagePosition: { from: number; to: number } | null = null;
+
+  // Widget for displaying images inline with resize handles
   class ImageWidget extends WidgetType {
     src: string;
     alt: string;
+    width: number | null;
+    from: number;
+    to: number;
 
-    constructor(src: string, alt: string) {
+    constructor(src: string, alt: string, width: number | null, from: number, to: number) {
       super();
       this.src = src;
       this.alt = alt;
+      this.width = width;
+      this.from = from;
+      this.to = to;
     }
 
     eq(other: ImageWidget) {
-      return other.src === this.src && other.alt === this.alt;
+      return other.src === this.src && other.alt === this.alt && other.width === this.width;
     }
 
-    toDOM() {
-      const wrap = document.createElement('span');
-      wrap.className = 'cm-image-widget';
-      wrap.contentEditable = 'false'; // Make it uneditable
+    toDOM(view: EditorView) {
+      const container = document.createElement('div');
+      container.className = 'cm-image-container';
+      container.contentEditable = 'false';
+      container.style.position = 'relative';
+      container.style.display = 'inline-block';
+      container.style.margin = '8px 0';
+      container.style.maxWidth = '100%';
+
       const img = document.createElement('img');
       img.src = this.src;
       img.alt = this.alt;
-      img.style.maxWidth = '100%';
       img.style.display = 'block';
-      img.style.margin = '8px 0';
       img.style.borderRadius = '4px';
-      img.style.cursor = 'default';
-      wrap.appendChild(img);
-      return wrap;
+      img.style.maxWidth = '100%';
+      img.style.height = 'auto';
+
+      if (this.width) {
+        img.style.width = `${this.width}px`;
+      }
+
+      // Click to select
+      container.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectImage(container, this.from, this.to, view);
+      });
+
+      container.appendChild(img);
+      return container;
     }
 
     ignoreEvent() {
-      return true; // Don't allow events to pass through
+      return false; // Allow click events
+    }
+  }
+
+  // Select an image
+  function selectImage(element: HTMLElement, from: number, to: number, view: EditorView) {
+    // Deselect previous
+    if (selectedImageElement && selectedImageElement !== element) {
+      selectedImageElement.classList.remove('selected');
+      removeResizeHandles(selectedImageElement);
+    }
+
+    selectedImageElement = element;
+    selectedImagePosition = { from, to };
+    element.classList.add('selected');
+    addResizeHandles(element, view, from, to);
+  }
+
+  // Deselect image
+  function deselectImage() {
+    if (selectedImageElement) {
+      selectedImageElement.classList.remove('selected');
+      removeResizeHandles(selectedImageElement);
+      selectedImageElement = null;
+      selectedImagePosition = null;
+    }
+  }
+
+  // Add resize handles
+  function addResizeHandles(container: HTMLElement, view: EditorView, from: number, to: number) {
+    const handles = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+    const img = container.querySelector('img') as HTMLImageElement;
+
+    handles.forEach(position => {
+      const handle = document.createElement('div');
+      handle.className = `resize-handle resize-handle-${position}`;
+      handle.style.position = 'absolute';
+      handle.style.width = '8px';
+      handle.style.height = '8px';
+      handle.style.background = '#4A90E2';
+      handle.style.border = '1px solid white';
+      handle.style.borderRadius = '50%';
+      handle.style.cursor = `${position}-resize`;
+      handle.style.zIndex = '10';
+
+      // Position handles
+      if (position.includes('n')) handle.style.top = '-4px';
+      if (position.includes('s')) handle.style.bottom = '-4px';
+      if (position.includes('w')) handle.style.left = '-4px';
+      if (position.includes('e')) handle.style.right = '-4px';
+      if (!position.includes('n') && !position.includes('s')) handle.style.top = 'calc(50% - 4px)';
+      if (!position.includes('w') && !position.includes('e')) handle.style.left = 'calc(50% - 4px)';
+
+      let startX: number, startY: number, startWidth: number, startHeight: number, aspectRatio: number;
+
+      handle.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+
+        startX = e.clientX;
+        startY = e.clientY;
+        startWidth = img.offsetWidth;
+        startHeight = img.offsetHeight;
+        aspectRatio = startWidth / startHeight;
+
+        const onMouseMove = (moveEvent: MouseEvent) => {
+          const deltaX = moveEvent.clientX - startX;
+          const deltaY = moveEvent.clientY - startY;
+
+          let newWidth = startWidth;
+
+          // Calculate new width based on handle position
+          if (position.includes('e')) {
+            newWidth = startWidth + deltaX;
+          } else if (position.includes('w')) {
+            newWidth = startWidth - deltaX;
+          } else if (position.includes('n') || position.includes('s')) {
+            newWidth = startWidth + (deltaY * aspectRatio * (position.includes('n') ? -1 : 1));
+          }
+
+          // Maintain aspect ratio and minimum size
+          newWidth = Math.max(50, Math.min(newWidth, container.parentElement!.offsetWidth));
+
+          img.style.width = `${newWidth}px`;
+          img.style.height = 'auto';
+        };
+
+        const onMouseUp = () => {
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+
+          // Update markdown with new width
+          const newWidth = img.offsetWidth;
+          updateImageWidth(view, from, to, newWidth);
+        };
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+
+      container.appendChild(handle);
+    });
+  }
+
+  // Remove resize handles
+  function removeResizeHandles(container: HTMLElement) {
+    const handles = container.querySelectorAll('.resize-handle');
+    handles.forEach(handle => handle.remove());
+  }
+
+  // Update image width in markdown
+  function updateImageWidth(view: EditorView, from: number, to: number, width: number) {
+    const text = view.state.doc.sliceString(from, to);
+    const match = text.match(/!\[([^\]]*)\]\(([^)]+)\)/);
+
+    if (match) {
+      const alt = match[1];
+      const src = match[2];
+      // Store width as a comment in markdown: ![alt](src)<!-- width:123 -->
+      const newText = `![${alt}](${src})<!-- width:${Math.round(width)} -->`;
+
+      view.dispatch({
+        changes: { from, to, insert: newText }
+      });
     }
   }
 
@@ -92,7 +240,8 @@
   // Create decorations for images
   function createImageDecorations(view: EditorView): DecorationSet {
     const widgets: Range<Decoration>[] = [];
-    const imageRegex = /!\[([^\]]*)\]\((\.\/[^)]+)\)/g;
+    // Match ![alt](src) optionally followed by <!-- width:123 -->
+    const imageRegex = /!\[([^\]]*)\]\((\.\/[^)]+)\)(?:<!--\s*width:(\d+)\s*-->)?/g;
     const text = view.state.doc.toString();
 
     console.log('[MarkdownEditor] Creating image decorations, text length:', text.length);
@@ -105,8 +254,9 @@
       const to = from + match[0].length;
       const alt = match[1];
       const src = match[2];
+      const width = match[3] ? parseInt(match[3]) : null;
 
-      console.log('[MarkdownEditor] Found image:', { src, alt, from, to });
+      console.log('[MarkdownEditor] Found image:', { src, alt, width, from, to });
 
       // Load image asynchronously if not cached
       const cachedDataUrl = imageCache.get(src);
@@ -122,9 +272,8 @@
       } else {
         console.log('[MarkdownEditor] Image cached, creating widget:', src);
         // Replace the markdown with an image widget
-        // Use atomic: true to make it deletable as a single unit
         const deco = Decoration.replace({
-          widget: new ImageWidget(cachedDataUrl, alt),
+          widget: new ImageWidget(cachedDataUrl, alt, width, from, to),
           inclusive: true,
           block: false,
         });
@@ -294,6 +443,19 @@
             return handleImagePaste(event, view);
           },
           keydown: (event, view) => {
+            // Handle Delete/Backspace key for selected images
+            if ((event.key === 'Delete' || event.key === 'Backspace') && selectedImagePosition) {
+              event.preventDefault();
+
+              const { from, to } = selectedImagePosition;
+              view.dispatch({
+                changes: { from, to, insert: '' }
+              });
+
+              deselectImage();
+              return true;
+            }
+
             // Detect Cmd+V or Ctrl+V
             if ((event.metaKey || event.ctrlKey) && event.key === 'v') {
               event.preventDefault(); // Prevent default paste
@@ -358,6 +520,14 @@
             }
 
             return false; // Don't prevent default for other keys
+          },
+          click: (event, view) => {
+            // Deselect image when clicking outside
+            const target = event.target as HTMLElement;
+            if (!target.closest('.cm-image-container')) {
+              deselectImage();
+            }
+            return false;
           }
         }),
         EditorView.updateListener.of((update) => {
@@ -434,5 +604,34 @@
 
   :global(.cm-editor) {
     height: 100%;
+  }
+
+  :global(.cm-image-container) {
+    position: relative;
+    display: inline-block;
+    margin: 8px 0;
+    max-width: 100%;
+  }
+
+  :global(.cm-image-container.selected) {
+    outline: 2px solid #4A90E2;
+    outline-offset: 2px;
+  }
+
+  :global(.resize-handle) {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: #4A90E2;
+    border: 1px solid white;
+    border-radius: 50%;
+    z-index: 10;
+  }
+
+  :global(.cm-image-container img) {
+    display: block;
+    border-radius: 4px;
+    max-width: 100%;
+    height: auto;
   }
 </style>

@@ -75,7 +75,17 @@
         const cachedDataUrl = imageCache.get(href);
 
         if (cachedDataUrl) {
-          return `<img src="${cachedDataUrl}" alt="${text}" title="${title || ''}" />`;
+          // Find width comment after this image: <!-- width:123 -->
+          // Simple approach: search for the path followed by width comment
+          const escapedHref = href.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const widthRegex = new RegExp(`\\(${escapedHref}\\)<!--\\s*width:(\\d+)\\s*-->`);
+          const widthMatch = content.match(widthRegex);
+          const width = widthMatch ? parseInt(widthMatch[1]) : null;
+
+          console.log('[MarkdownPreview] Image:', href, 'Width:', width);
+
+          const widthStyle = width ? ` style="width: ${width}px; height: auto;"` : '';
+          return `<img src="${cachedDataUrl}" alt="${text}" title="${title || ''}"${widthStyle} />`;
         } else {
           // Show placeholder while loading
           return `<img src="" alt="${text}" title="${title || ''}" style="display:none;" />`;
