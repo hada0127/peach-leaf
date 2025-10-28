@@ -75,6 +75,8 @@
       // Click to select
       container.addEventListener('click', (e) => {
         e.stopPropagation();
+        e.preventDefault();
+        console.log('[MarkdownEditor] Image clicked, selecting:', this.from, this.to);
         selectImage(container, this.from, this.to, view);
       });
 
@@ -89,8 +91,11 @@
 
   // Select an image
   function selectImage(element: HTMLElement, from: number, to: number, view: EditorView) {
+    console.log('[MarkdownEditor] selectImage called:', from, to);
+
     // Deselect previous
     if (selectedImageElement && selectedImageElement !== element) {
+      console.log('[MarkdownEditor] Deselecting previous image');
       selectedImageElement.classList.remove('selected');
       removeResizeHandles(selectedImageElement);
     }
@@ -98,6 +103,15 @@
     selectedImageElement = element;
     selectedImagePosition = { from, to };
     element.classList.add('selected');
+    console.log('[MarkdownEditor] Image selected, position:', selectedImagePosition);
+
+    // Hide cursor by setting selection to empty range at image position
+    // This keeps focus but hides the cursor
+    view.dispatch({
+      selection: { anchor: from, head: from },
+      scrollIntoView: false
+    });
+
     addResizeHandles(element, view, from, to);
   }
 
@@ -348,16 +362,28 @@
   const imagePlugin = ViewPlugin.fromClass(
     class {
       decorations: DecorationSet;
+      lastCacheSize: number;
 
       constructor(view: EditorView) {
         console.log('[MarkdownEditor] ImagePlugin constructor');
         this.decorations = createImageDecorations(view);
+        this.lastCacheSize = imageCache.size;
       }
 
       update(update: ViewUpdate) {
-        // Always update decorations, including for transactions triggered by image loading
-        console.log('[MarkdownEditor] ImagePlugin update, docChanged:', update.docChanged);
-        this.decorations = createImageDecorations(update.view);
+        const currentCacheSize = imageCache.size;
+        const cacheChanged = currentCacheSize !== this.lastCacheSize;
+
+        console.log('[MarkdownEditor] ImagePlugin update, docChanged:', update.docChanged, 'cacheChanged:', cacheChanged, 'cacheSize:', currentCacheSize);
+
+        // Update if document changed OR cache changed (added/removed images)
+        if (update.docChanged || cacheChanged) {
+          console.log('[MarkdownEditor] Rebuilding image decorations');
+          this.decorations = createImageDecorations(update.view);
+          this.lastCacheSize = currentCacheSize;
+        } else {
+          console.log('[MarkdownEditor] Skipping rebuild - no changes detected');
+        }
       }
     },
     {
@@ -478,6 +504,60 @@
 
     console.log('[MarkdownEditor] onMount called, filePath:', filePath);
 
+    // Custom keymap for image selection (must be before defaultKeymap)
+    const imageSelectionKeymap = keymap.of([
+      {
+        key: 'Delete',
+        run: (view) => {
+          if (selectedImagePosition) {
+            console.log('[MarkdownEditor] Delete key pressed with selected image');
+            const { from, to } = selectedImagePosition;
+            const text = view.state.doc.sliceString(from, to);
+            const match = text.match(/!\[([^\]]*)\]\((\.\/[^)]+)\)/);
+
+            if (match) {
+              const src = match[2];
+              console.log('[MarkdownEditor] Removing image from cache:', src);
+              imageCache.delete(src);
+            }
+
+            view.dispatch({
+              changes: { from, to, insert: '' }
+            });
+
+            deselectImage();
+            return true;
+          }
+          return false;
+        }
+      },
+      {
+        key: 'Backspace',
+        run: (view) => {
+          if (selectedImagePosition) {
+            console.log('[MarkdownEditor] Backspace key pressed with selected image');
+            const { from, to } = selectedImagePosition;
+            const text = view.state.doc.sliceString(from, to);
+            const match = text.match(/!\[([^\]]*)\]\((\.\/[^)]+)\)/);
+
+            if (match) {
+              const src = match[2];
+              console.log('[MarkdownEditor] Removing image from cache:', src);
+              imageCache.delete(src);
+            }
+
+            view.dispatch({
+              changes: { from, to, insert: '' }
+            });
+
+            deselectImage();
+            return true;
+          }
+          return false;
+        }
+      }
+    ]);
+
     const startState = EditorState.create({
       doc: content,
       extensions: [
@@ -491,6 +571,7 @@
         bracketMatching(),
         // lineNumbers(), // 줄번호 제거
         highlightActiveLine(),
+        imageSelectionKeymap, // Image selection keymap BEFORE default keymap
         keymap.of([...defaultKeymap, ...historyKeymap]),
         markdown(),
         EditorView.lineWrapping, // 자동 줄바꿈 활성화
@@ -502,21 +583,16 @@
             console.log('[MarkdownEditor] CodeMirror paste handler triggered!');
             return handleImagePaste(event, view);
           },
-          keydown: (event, view) => {
-            // Handle Delete/Backspace key for selected images
-            if ((event.key === 'Delete' || event.key === 'Backspace') && selectedImagePosition) {
-              event.preventDefault();
-
-              const { from, to } = selectedImagePosition;
-              view.dispatch({
-                changes: { from, to, insert: '' }
-              });
-
+          mousedown: (event, view) => {
+            // Deselect image when clicking on editor content (not on image)
+            const target = event.target as HTMLElement;
+            if (!target.closest('.image-container')) {
               deselectImage();
-              return true;
             }
-
-            // Handle Backspace when cursor is right after an image
+            return false;
+          },
+          keydown: (event, view) => {
+            // Handle Backspace when cursor is right after an image (not selected)
             if (event.key === 'Backspace' && !selectedImagePosition) {
               const cursor = view.state.selection.main.head;
               const text = view.state.doc.toString();
@@ -531,8 +607,11 @@
                 const imageLength = match[0].length;
                 const from = cursor - imageLength;
                 const to = cursor;
+                const src = match[2];
 
                 console.log('[MarkdownEditor] Deleting image at cursor:', from, to);
+                console.log('[MarkdownEditor] Removing image from cache:', src);
+                imageCache.delete(src);
 
                 view.dispatch({
                   changes: { from, to, insert: '' }
@@ -610,8 +689,13 @@
           click: (event, view) => {
             // Deselect image when clicking outside
             const target = event.target as HTMLElement;
-            if (!target.closest('.cm-image-container')) {
+            const imageContainer = target.closest('.cm-image-container');
+
+            if (!imageContainer) {
+              console.log('[MarkdownEditor] Click outside image, deselecting');
               deselectImage();
+            } else {
+              console.log('[MarkdownEditor] Click on image container');
             }
             return false;
           }
