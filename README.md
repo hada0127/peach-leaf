@@ -1,78 +1,222 @@
 # PeachLeaf
 
-크로스 플랫폼 마크다운 스티커 노트 애플리케이션
+A beautiful, lightweight markdown sticky notes application for macOS.
 
-## 주요 기능
+![PeachLeaf](https://img.shields.io/badge/platform-macOS-lightgrey)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
-- **크로스 플랫폼 지원**: Windows, Linux, macOS에서 동작
-- **마크다운 지원**: 마크다운 파일을 편집하고 미리보기
-- **3가지 편집 모드**:
-  - 편집 모드: 마크다운 구문으로 편집
-  - 미리보기 모드: 렌더링된 마크다운 보기
-  - 리치텍스트 모드: WYSIWYG 편집
-- **자동 저장**: 500ms 디바운스로 자동 저장
-- **커스터마이징**: 배경색과 글자색 변경 가능
-- **자유로운 배치**: 스티커 이동 및 크기 조절
-- **단축키 지원**: 편집 가능한 키보드 단축키
+## Overview
 
-## 설치
+PeachLeaf is a native macOS application that brings the simplicity of sticky notes with the power of markdown. Create multiple floating note windows, customize their appearance, and organize your thoughts with markdown formatting and inline images.
+
+## Features
+
+### 📝 Markdown Editing
+- Full markdown syntax support with live preview
+- Syntax highlighting with CodeMirror 6
+- Switch between edit and preview modes
+- Auto-save with 500ms debounce
+
+### 🖼️ Image Support
+- Paste images directly from clipboard (⌘V)
+- Drag and drop images into notes
+- Inline image preview while editing
+- Resize images with 8-directional handles
+- Maintain aspect ratio during resize
+- Images stored locally with your notes
+
+### 🎨 Customization
+- Choose from predefined color palettes
+- Separate background and text colors
+- Persistent color settings per note
+- Font size adjustment (5 levels)
+
+### 🪟 Window Management
+- Create multiple independent note windows
+- Drag windows anywhere on screen
+- Resize notes to your preference
+- Multi-monitor support with position persistence
+- Auto-restore windows on app launch
+
+### ⌨️ Keyboard Shortcuts
+- `⌘N` - Create new note
+- `⌘W` - Close current note
+- `⌘M` - Toggle edit/preview mode
+- `⌘V` - Paste image from clipboard
+- `⌘Z` / `⌘⇧Z` - Undo / Redo
+- `Delete` / `Backspace` - Delete selected image
+
+## Installation
+
+### Download
+Download the latest release from the [Releases](https://github.com/yourusername/peach-leaf/releases) page.
+
+### From Source
+
+**Prerequisites:**
+- Node.js 18+ and npm
+- Rust 1.70+
+- Xcode Command Line Tools (macOS)
+
+**Install and Run:**
 
 ```bash
-# 의존성 설치
+# Clone the repository
+git clone https://github.com/yourusername/peach-leaf.git
+cd peach-leaf
+
+# Install dependencies
 npm install
 
-# 개발 모드 실행
+# Run in development mode
 npm run dev
 
-# 빌드
+# Build for production
+npm run build
+```
+
+## Usage
+
+### Creating Notes
+
+1. **First Launch**: A default note window will appear
+2. **New Note**: Press `⌘N` or select `File → New Note` from the menu
+3. **Start Typing**: Click anywhere in the note to start editing
+
+### Working with Images
+
+#### Adding Images
+- **Paste**: Copy an image and press `⌘V` in the editor
+- **Drag & Drop**: Drag image files directly into the note
+
+#### Resizing Images
+1. Click on an image to select it
+2. Drag any of the 8 resize handles (corners or edges)
+3. The image will maintain its aspect ratio
+
+#### Deleting Images
+- Click on an image to select it
+- Press `Delete` or `Backspace`
+
+### Customizing Colors
+
+1. Select `Color → Choose Color...` from the menu
+2. Click on a color palette
+3. The color picker will close automatically
+
+### Switching Modes
+
+- **Edit Mode**: Full markdown editing with syntax highlighting
+- **Preview Mode**: Rendered markdown view
+- Toggle: Press `⌘M` or click the mode button in toolbar
+
+### Font Sizes
+
+Select `Font` from the menu and choose:
+- Default (16px)
+- Small (14px)
+- Medium (18px)
+- Large (20px)
+- Extra Large (24px)
+
+## File Storage
+
+All data is stored locally in your home directory:
+
+```
+~/.peach-leaf/
+├── state.json                    # Window positions and settings
+└── notes/
+    ├── note-1234567890.md        # Note content
+    └── images/
+        └── note-1234567890/      # Images for this note
+            ├── image-1234567891.png
+            └── image-1234567892.png
+```
+
+### Markdown Format
+
+Notes are stored as plain markdown files with optional width comments for images:
+
+```markdown
+# My Note
+
+Some text here.
+
+![image](./images/note-1234567890/image-1234567891.png)<!-- width:600 -->
+
+More text.
+```
+
+## Building from Source
+
+### Development
+
+```bash
+# Run with hot reload
+npm run dev
+
+# Build frontend only
+npm run build:renderer
+```
+
+### Production Build
+
+```bash
+# Build the complete application
 npm run build
 
-# 패키징
-npm run package
-
-# 모든 플랫폼 빌드
-npm run package:all
+# The output will be in src-tauri/target/release/bundle/
 ```
 
-## 사용법
+## Troubleshooting
 
-### 기본 단축키
+### Notes Don't Restore on Launch
+- Check `~/.peach-leaf/state.json` exists
+- Verify file permissions
+- Try restarting the app
 
-- `Cmd/Ctrl + M`: 모드 전환 (편집 → 미리보기 → 리치텍스트)
-- `Cmd/Ctrl + Shift + N`: 새 스티커 생성
+### Images Not Displaying
+- Ensure images are in `~/.peach-leaf/notes/images/`
+- Check markdown syntax: `![alt](./images/note-id/image.png)`
+- Verify image files exist on disk
 
-### 스티커 조작
+### App Won't Launch
+- Check macOS version (requires macOS 10.15+)
+- Verify app is not in quarantine: `xattr -d com.apple.quarantine /path/to/PeachLeaf.app`
 
-- 상단 툴바를 드래그하여 이동
-- 창 테두리를 드래그하여 크기 조절
-- 🎨 버튼으로 색상 변경
-- ✕ 버튼으로 스티커 닫기
+## Technology Stack
 
-## 기술 스택
+- **Frontend**: Svelte 5, TypeScript, Vite
+- **Editor**: CodeMirror 6
+- **Backend**: Tauri 2.9, Rust
+- **Markdown**: Marked 11.x
+- **Styling**: CSS with Svelte scoped styles
 
-- **Electron**: 크로스 플랫폼 데스크톱 앱
-- **Svelte**: 경량 UI 프레임워크
-- **TypeScript**: 타입 안전성
-- **CodeMirror 6**: 마크다운 편집기
-- **marked**: 마크다운 렌더링
-- **electron-store**: 설정 저장
+## Contributing
 
-## 프로젝트 구조
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-```
-peach-leaf/
-├── src/
-│   ├── main/           # Electron 메인 프로세스
-│   │   ├── main.ts     # 앱 진입점, 창 관리
-│   │   └── preload.ts  # IPC 브릿지
-│   └── renderer/       # Svelte UI
-│       ├── components/ # UI 컴포넌트
-│       ├── App.svelte  # 루트 컴포넌트
-│       └── main.ts     # 렌더러 진입점
-├── package.json
-└── vite.config.ts
-```
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## 라이선스
+## License
 
-MIT
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- Built with [Tauri](https://tauri.app/)
+- Markdown editing powered by [CodeMirror](https://codemirror.net/)
+- Markdown rendering by [Marked](https://marked.js.org/)
+
+## Support
+
+If you encounter any issues or have questions, please [open an issue](https://github.com/yourusername/peach-leaf/issues).
+
+---
+
+Made with ❤️ for macOS

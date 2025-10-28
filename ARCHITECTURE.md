@@ -2,12 +2,12 @@
 
 ## Overview
 
-PeachLeaf는 Tauri 2.x, Svelte 5, Rust로 구축된 macOS 전용 마크다운 스티커 노트 애플리케이션입니다. 네이티브 데스크톱 환경에서 마크다운 편집 기능, 다중 노트 윈도우, 영구 상태 관리를 제공합니다.
+PeachLeaf is a macOS-exclusive markdown sticky note application built with Tauri 2.x, Svelte 5, and Rust. It provides markdown editing capabilities, multiple note windows, and persistent state management in a native desktop environment.
 
 ## Technology Stack
 
 ### Frontend
-- **Framework**: Svelte 5 (with new runes API)
+- **Framework**: Svelte 5 (with runes API)
 - **Bundler**: Vite 5.4
 - **Editor**: CodeMirror 6
 - **Markdown Parser**: Marked 11.x
@@ -24,23 +24,23 @@ PeachLeaf는 Tauri 2.x, Svelte 5, Rust로 구축된 macOS 전용 마크다운 �
 
 ```
 peach-leaf/
-├── .claude/                      # Claude Code 설정
-│   ├── config.json               # 승인된 명령어
-│   ├── instructions.md           # 프로젝트 지침 (한글 응답, 아키텍처 참조)
-│   └── settings.local.json       # 권한 설정
-├── src/                          # 프론트엔드 소스
-│   └── renderer/                 # 렌더러 프로세스 (Svelte UI)
-│       ├── components/           # Svelte 컴포넌트
-│       │   ├── Sticker.svelte        # 메인 스티커 윈도우 컴포넌트
-│       │   ├── MarkdownEditor.svelte # CodeMirror 기반 에디터
-│       │   ├── MarkdownPreview.svelte # 마크다운 프리뷰 렌더러
-│       │   ├── Toolbar.svelte        # 윈도우 툴바
-│       │   └── ColorPicker.svelte    # 색상 선택 UI
-│       ├── lib/                  # 유틸리티 라이브러리
-│       │   └── tauri.ts          # Tauri API 래퍼
-│       ├── App.svelte            # 루트 컴포넌트
-│       └── main.ts               # 진입점
-├── src-tauri/                    # 백엔드 소스 (Rust)
+├── .claude/                      # Claude Code configuration
+│   ├── config.json               # Approved commands
+│   ├── instructions.md           # Project guidelines
+│   └── settings.local.json       # Permission settings
+├── src/                          # Frontend source
+│   └── renderer/                 # Renderer process (Svelte UI)
+│       ├── components/           # Svelte components
+│       │   ├── Sticker.svelte        # Main sticker window component
+│       │   ├── MarkdownEditor.svelte # CodeMirror-based editor
+│       │   ├── MarkdownPreview.svelte # Markdown preview renderer
+│       │   ├── Toolbar.svelte        # Window toolbar
+│       │   └── ColorPicker.svelte    # Color selection UI
+│       ├── lib/                  # Utility libraries
+│       │   └── tauri.ts          # Tauri API wrapper
+│       ├── App.svelte            # Root component
+│       └── main.ts               # Entry point
+├── src-tauri/                    # Backend source (Rust)
 │   ├── src/
 │   │   ├── main.rs                   # Entry point (6 lines)
 │   │   ├── lib.rs                    # App initialization & composition (94 lines)
@@ -58,9 +58,10 @@ peach-leaf/
 │   └── icons/                    # macOS app icons
 │
 ├── dist/                         # Build output
-│   └── renderer/                 # 프론트엔드 빌드 결과물
+│   └── renderer/                 # Frontend build artifacts
 ├── node_modules/                 # NPM dependencies
-├── ARCHITECTURE.md               # 프로젝트 아키텍처 문서 (이 파일)
+├── ARCHITECTURE.md               # Project architecture document
+├── ARCHITECTURE.ko.md            # Project architecture document (Korean)
 ├── package.json                  # NPM configuration
 ├── tsconfig.json                 # TypeScript configuration
 └── vite.config.mjs               # Vite configuration
@@ -101,6 +102,7 @@ peach-leaf/
 │                      File System                              │
 │        ~/.peach-leaf/state.json                              │
 │        ~/.peach-leaf/notes/*.md                              │
+│        ~/.peach-leaf/notes/images/{note-id}/*.png            │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -127,6 +129,7 @@ State persistence and file system management.
 **Storage Location:** `~/.peach-leaf/`
 - `state.json`: Window positions, sizes, colors, modes
 - `notes/`: Markdown files for each note
+- `notes/images/{note-id}/`: Image files for each note (PNG format)
 
 ### 3. **commands/file.rs** (45 lines)
 File I/O operations exposed to the frontend.
@@ -246,6 +249,15 @@ App.svelte
 - Markdown syntax highlighting
 - Auto-save on content change
 - Undo/Redo support
+- **Image Management**:
+  - Paste image from clipboard (converts to PNG, saves to `./images/{note-id}/`)
+  - Drag & drop image support
+  - Inline image preview with widget system
+  - Image resize with 8-directional handles
+  - Image selection and deletion (Delete/Backspace)
+  - Image width persistence via markdown comments (`<!-- width:XXX -->`)
+  - Image cache for loaded images (data URLs)
+  - Smart deletion: removes image from cache when markdown reference deleted
 
 #### **MarkdownPreview.svelte**
 - Render markdown to HTML
@@ -321,6 +333,49 @@ main.rs::main
   → menu::setup_menu_handler
 ```
 
+### 6. Image Paste/Insert
+```
+User pastes image (⌘V)
+  → MarkdownEditor.svelte::handleImagePaste
+  → convertImageToBlob (clipboard)
+  → saveImageFile (Tauri FS API)
+  → Insert markdown: ![image](./images/{note-id}/{timestamp}.png)
+  → ImagePlugin creates widget
+  → loadImageAsDataUrl (Tauri FS API)
+  → imageCache stores data URL
+  → Render inline image preview
+```
+
+### 7. Image Resize
+```
+User drags resize handle
+  → ImageWidget resize event
+  → Calculate new dimensions (maintain aspect ratio)
+  → updateImageWidth(view, from, to, width)
+  → Update markdown: ![image](path)<!-- width:XXX -->
+  → Update selectedImagePosition with new range
+  → ImagePlugin rebuilds with new size
+```
+
+### 8. Image Deletion
+```
+User selects image and presses Delete/Backspace
+  → imageSelectionKeymap intercepts key
+  → Extract image src from markdown
+  → imageCache.delete(src)
+  → Delete markdown range (including width comment)
+  → ImagePlugin rebuilds
+  → Image file remains on disk (for undo support)
+
+OR
+
+User deletes markdown text manually
+  → MarkdownEditor detects doc change
+  → ImagePlugin compares cached images vs current doc
+  → Removes deleted images from cache
+  → Widgets for deleted images not rendered
+```
+
 ## State Management
 
 ### Backend State
@@ -354,6 +409,174 @@ main.rs::main
 - `$effect`: Side effects on state changes
 - `$props`: Component properties
 
+### MarkdownEditor Image State
+- **imageCache**: `Map<string, string>` - Maps image paths to data URLs
+- **selectedImageElement**: `HTMLElement | null` - Currently selected image DOM element
+- **selectedImagePosition**: `{from: number, to: number} | null` - Selected image markdown range
+- **ImagePlugin decorations**: Dynamic widgets for rendering images inline
+- **Image widget lifecycle**:
+  1. Parse markdown for `![alt](path)` or `![alt](path)<!-- width:XXX -->`
+  2. Load image via Tauri FS API
+  3. Cache data URL in imageCache
+  4. Create Decoration.replace() with ImageWidget
+  5. Render img element with resize handles when selected
+
+## Image System Architecture
+
+### Overview
+MarkdownEditor.svelte implements a comprehensive image management system using CodeMirror 6's extension API. Images are stored as files and referenced in markdown, with inline previews rendered as custom widgets.
+
+### Core Components
+
+#### 1. **ImageWidget (WidgetType)**
+Custom CodeMirror widget that renders image previews inline.
+
+**Features:**
+- Loads images via Tauri FS API and converts to data URLs
+- Renders `<img>` elements with container wrappers
+- Supports width specification via markdown comments
+- Maintains aspect ratio during resize
+- Adds visual selection state with CSS class
+
+**Lifecycle:**
+```typescript
+constructor(src, alt, width) → toDOM() → eq() → destroy()
+```
+
+#### 2. **ImagePlugin (ViewPlugin)**
+Manages image decoration lifecycle and cache synchronization.
+
+**Responsibilities:**
+- Parse markdown for image syntax: `![alt](path)` and `![alt](path)<!-- width:XXX -->`
+- Create `Decoration.replace()` for each image
+- Track cache size to detect image additions/removals
+- Rebuild decorations only when document or cache changes
+- Provide decorations to editor view
+
+**Optimization:**
+- Caches last cache size to avoid unnecessary rebuilds
+- Only triggers rebuild on `docChanged` or cache size changes
+
+#### 3. **Image Cache**
+`Map<string, string>` that stores loaded images as data URLs.
+
+**Purpose:**
+- Avoid repeated file system reads
+- Enable instant widget rendering
+- Synchronize with document state
+- Detect deleted images
+
+**Cache Operations:**
+- `imageCache.set(src, dataUrl)`: Store loaded image
+- `imageCache.get(src)`: Retrieve cached image
+- `imageCache.delete(src)`: Remove on deletion
+- `imageCache.size`: Track for change detection
+
+#### 4. **Selection System**
+Tracks selected image for resize and deletion operations.
+
+**State:**
+- `selectedImageElement`: DOM element reference
+- `selectedImagePosition`: `{from, to}` markdown range
+
+**Behaviors:**
+- Click image → select, add resize handles, hide cursor
+- Click outside → deselect, remove handles
+- Cursor positioning without blur (maintains keyboard events)
+
+#### 5. **Resize System**
+8-directional resize handles with aspect ratio preservation.
+
+**Handle Positions:**
+- Corners: `nw, ne, sw, se` (diagonal resize)
+- Edges: `n, s, e, w` (directional resize)
+
+**Resize Flow:**
+1. User drags handle
+2. Calculate delta from original position
+3. Compute new width (maintain aspect ratio)
+4. Update markdown with width comment
+5. Update `selectedImagePosition` to new range (including comment)
+6. Plugin rebuilds widget with new dimensions
+
+#### 6. **Deletion System**
+Two deletion mechanisms: selection-based and cursor-based.
+
+**Selection-based Deletion:**
+- Custom keymap with high priority (before `defaultKeymap`)
+- Intercepts Delete/Backspace when image selected
+- Deletes entire range including width comment
+- Removes from cache, triggers plugin rebuild
+
+**Cursor-based Deletion:**
+- Regex patterns detect image markdown at cursor position
+- Delete: cursor before image → match forward
+- Backspace: cursor after image → match backward
+- Handles optional width comment in regex
+
+**Regex Patterns:**
+```typescript
+// Forward (Delete)
+/^!\[([^\]]*)\]\((\.\/[^)]+)\)(?:<!--\s*width:(\d+)\s*-->)?/
+
+// Backward (Backspace)
+/!\[([^\]]*)\]\((\.\/[^)]+)\)(?:<!--\s*width:(\d+)\s*-->)?$/
+```
+
+#### 7. **Paste System**
+Clipboard image handling with file conversion.
+
+**Flow:**
+1. Intercept ⌘V keydown event
+2. Read clipboard items
+3. Find first image type item
+4. Convert blob to PNG
+5. Generate unique filename with timestamp
+6. Create images directory: `./images/{note-id}/`
+7. Save file via Tauri FS API
+8. Insert markdown at end of current line
+9. Plugin auto-loads and renders
+
+**File Naming:**
+```
+image-{timestamp}.png
+```
+
+**Directory Structure:**
+```
+~/.peach-leaf/notes/
+  note-1234567890.md
+  images/
+    note-1234567890/
+      image-1234567891.png
+      image-1234567892.png
+```
+
+### Markdown Format
+
+#### Basic Image
+```markdown
+![image](./images/note-1234567890/image-1234567891.png)
+```
+
+#### Image with Width
+```markdown
+![image](./images/note-1234567890/image-1234567891.png)<!-- width:600 -->
+```
+
+### Performance Considerations
+
+- **Lazy Loading**: Images loaded on-demand via FS API
+- **Caching**: Data URLs cached to avoid repeated reads
+- **Rebuild Throttling**: Plugin only rebuilds on actual changes
+- **Widget Equality**: `eq()` method prevents unnecessary re-renders
+
+### Browser Compatibility
+
+- Uses `navigator.clipboard.read()` for image paste
+- Requires `clipboard-read` permission (granted by Tauri)
+- Data URLs for image rendering (widely supported)
+
 ## Key Features
 
 ### 1. Multi-Monitor Support
@@ -386,6 +609,8 @@ main.rs::main
 - ⌘Z: Undo
 - ⌘⇧Z: Redo
 - ⌘X/C/V: Cut/Copy/Paste
+- ⌘V: Paste image from clipboard (in editor)
+- Delete/Backspace: Delete selected image
 
 ## Platform-Specific Behavior
 
@@ -397,8 +622,8 @@ main.rs::main
 
 ### Build Targets
 - **macOS**: DMG, APP bundle
-- **Windows**: Removed (not supported)
-- **Linux**: Removed (not supported)
+- **Windows**: Not supported
+- **Linux**: Not supported
 
 ## Configuration Files
 
@@ -484,8 +709,13 @@ lib.rs
 4. **Themes**: Dark mode, custom themes
 5. **Sync**: Cloud sync via WebDAV, Dropbox, etc.
 6. **Shortcuts**: Global hotkeys to show/hide notes
-7. **Rich Text**: Tables, checkboxes, images
+7. **Rich Text**: Tables, checkboxes
 8. **Note Linking**: Wiki-style links between notes
+9. **Image Enhancements**:
+   - Support for GIF, JPEG, WebP formats (currently PNG only)
+   - Image compression options
+   - Batch image operations
+   - Image caption editing
 
 ### Code Quality
 1. **Unit Tests**: Add tests for state management
