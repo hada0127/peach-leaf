@@ -221,6 +221,13 @@
       view.dispatch({
         changes: { from, to, insert: newText }
       });
+
+      // Update selectedImagePosition to include the new width comment
+      if (selectedImageElement) {
+        const newTo = from + newText.length;
+        selectedImagePosition = { from, to: newTo };
+        console.log('[MarkdownEditor] Updated selectedImagePosition after resize:', from, newTo);
+      }
     }
   }
 
@@ -513,6 +520,7 @@
             console.log('[MarkdownEditor] Delete key pressed with selected image');
             const { from, to } = selectedImagePosition;
             const text = view.state.doc.sliceString(from, to);
+            console.log('[MarkdownEditor] Deleting text:', text);
             const match = text.match(/!\[([^\]]*)\]\((\.\/[^)]+)\)/);
 
             if (match) {
@@ -610,6 +618,35 @@
                 const src = match[2];
 
                 console.log('[MarkdownEditor] Deleting image at cursor:', from, to);
+                console.log('[MarkdownEditor] Removing image from cache:', src);
+                imageCache.delete(src);
+
+                view.dispatch({
+                  changes: { from, to, insert: '' }
+                });
+
+                return true;
+              }
+            }
+
+            // Handle Delete when cursor is right before an image (not selected)
+            if (event.key === 'Delete' && !selectedImagePosition) {
+              const cursor = view.state.selection.main.head;
+              const text = view.state.doc.toString();
+
+              // Check if cursor is right before an image markdown (including optional width comment)
+              const imageRegex = /^!\[([^\]]*)\]\((\.\/[^)]+)\)(?:<!--\s*width:(\d+)\s*-->)?/;
+              const textAfterCursor = text.substring(cursor);
+              const match = textAfterCursor.match(imageRegex);
+
+              if (match) {
+                event.preventDefault();
+                const imageLength = match[0].length;
+                const from = cursor;
+                const to = cursor + imageLength;
+                const src = match[2];
+
+                console.log('[MarkdownEditor] Deleting image after cursor:', from, to);
                 console.log('[MarkdownEditor] Removing image from cache:', src);
                 imageCache.delete(src);
 
@@ -724,8 +761,8 @@
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
             color: textColor,
             lineHeight: '1.6',
-            paddingLeft: '16px',
-            paddingRight: '16px',
+            paddingLeft: '6px',
+            paddingRight: '6px',
           },
           '.cm-line': {
             lineHeight: '1.6 !important',
