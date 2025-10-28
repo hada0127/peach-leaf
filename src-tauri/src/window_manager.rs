@@ -177,6 +177,10 @@ pub fn restore_window(app: &tauri::AppHandle, sticker_data: StickerData) {
             if let Err(e) = window.emit("init-sticker", &sticker_data) {
                 eprintln!("Failed to emit init-sticker event: {}", e);
             }
+
+            // Update font menu checks based on restored font size
+            crate::menu::update_font_menu_checks(sticker_data.font_size);
+
             println!("Window {} restored successfully", sticker_data.id);
         }
         Err(e) => {

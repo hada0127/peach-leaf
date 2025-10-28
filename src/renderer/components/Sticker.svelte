@@ -574,6 +574,15 @@
         }
       }
     });
+
+    // Initial font menu update on mount
+    console.log(`[${data.id}] Initial font menu update`);
+    const { invoke } = await import('@tauri-apps/api/core');
+    try {
+      await invoke('on_window_focus', { windowLabel: data.id });
+    } catch (error) {
+      console.error(`[${data.id}] Failed to update font menu on mount:`, error);
+    }
   });
 
   onDestroy(() => {
