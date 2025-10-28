@@ -608,6 +608,11 @@
           '.cm-content': {
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
             color: textColor,
+            lineHeight: '1.6',
+          },
+          '.cm-line': {
+            lineHeight: '1.6 !important',
+            padding: '0 !important',
           },
           '.cm-scroller': {
             overflow: 'auto',

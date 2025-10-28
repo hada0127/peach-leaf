@@ -113,38 +113,38 @@
 
   .preview :global(h1) {
     font-size: 1.8em;
-    margin-top: 0.5em;
-    margin-bottom: 0.5em;
+    margin: 0;
+    padding: 0;
   }
 
   .preview :global(h2) {
     font-size: 1.5em;
-    margin-top: 0.5em;
-    margin-bottom: 0.5em;
+    margin: 0;
+    padding: 0;
   }
 
   .preview :global(h3) {
     font-size: 1.3em;
-    margin-top: 0.5em;
-    margin-bottom: 0.5em;
+    margin: 0;
+    padding: 0;
   }
 
   .preview :global(h4) {
     font-size: 1.1em;
-    margin-top: 0.5em;
-    margin-bottom: 0.5em;
+    margin: 0;
+    padding: 0;
   }
 
   .preview :global(h5) {
     font-size: 1.0em;
-    margin-top: 0.5em;
-    margin-bottom: 0.5em;
+    margin: 0;
+    padding: 0;
   }
 
   .preview :global(h6) {
     font-size: 0.9em;
-    margin-top: 0.5em;
-    margin-bottom: 0.5em;
+    margin: 0;
+    padding: 0;
   }
 
   .preview :global(code) {
