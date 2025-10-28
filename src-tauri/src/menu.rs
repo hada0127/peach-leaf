@@ -65,16 +65,14 @@ pub fn create_menu(app: &tauri::App) -> Result<Menu<tauri::Wry>, tauri::Error> {
         });
     }
 
-    let font_menu = SubmenuBuilder::new(app, "Font")
+    // Style Menu - combines color and font options (color first)
+    let style_menu = SubmenuBuilder::new(app, "Style")
+        .item(&MenuItemBuilder::new("Choose Color...").id("open_color_picker").build(app)?)
+        .separator()
         .item(&font_small)
         .item(&font_medium)
         .item(&font_large)
         .item(&font_xlarge)
-        .build()?;
-
-    // Color Menu - single item that opens picker
-    let color_menu = SubmenuBuilder::new(app, "Color")
-        .item(&MenuItemBuilder::new("Choose Color...").id("open_color_picker").build(app)?)
         .build()?;
 
     // Window Menu
@@ -94,8 +92,7 @@ pub fn create_menu(app: &tauri::App) -> Result<Menu<tauri::Wry>, tauri::Error> {
         .item(&app_menu)
         .item(&file_menu)
         .item(&edit_menu)
-        .item(&font_menu)
-        .item(&color_menu)
+        .item(&style_menu)
         .item(&window_menu)
         .item(&help_menu)
         .build()?;
@@ -104,8 +101,7 @@ pub fn create_menu(app: &tauri::App) -> Result<Menu<tauri::Wry>, tauri::Error> {
     let menu = MenuBuilder::new(app)
         .item(&file_menu)
         .item(&edit_menu)
-        .item(&font_menu)
-        .item(&color_menu)
+        .item(&style_menu)
         .item(&window_menu)
         .item(&help_menu)
         .build()?;
