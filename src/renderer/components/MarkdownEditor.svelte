@@ -643,14 +643,19 @@
                     console.log('[MarkdownEditor] Image pasted from clipboard:', relativePath);
 
                     const cursor = view.state.selection.main.head;
-                    const imageMarkdown = `![image](${relativePath})`;
+                    const doc = view.state.doc;
+                    const line = doc.lineAt(cursor);
+
+                    // Insert at the end of current line with newline
+                    const insertPos = line.to;
+                    const imageMarkdown = `\n![image](${relativePath})`;
 
                     view.dispatch({
                       changes: {
-                        from: cursor,
+                        from: insertPos,
                         insert: imageMarkdown
                       },
-                      selection: { anchor: cursor + imageMarkdown.length }
+                      selection: { anchor: insertPos + imageMarkdown.length }
                     });
 
                     return;
@@ -813,6 +818,7 @@
     display: inline-block;
     margin: 8px 0;
     max-width: 100%;
+    vertical-align: middle;
   }
 
   :global(.cm-image-container.selected) {
