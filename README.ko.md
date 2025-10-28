@@ -1,9 +1,17 @@
 # PeachLeaf
 
-macOS를 위한 아름답고 가벼운 마크다운 스티커 노트 애플리케이션.
+<p align="center">
+  <img src="app-icon.png" alt="PeachLeaf 로고" width="128" height="128">
+</p>
 
-![PeachLeaf](https://img.shields.io/badge/platform-macOS-lightgrey)
-![License](https://img.shields.io/badge/license-MIT-blue)
+<p align="center">
+  macOS를 위한 아름답고 가벼운 마크다운 스티커 노트 애플리케이션.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/platform-macOS-lightgrey" alt="플랫폼">
+  <img src="https://img.shields.io/badge/license-MIT-blue" alt="라이선스">
+</p>
 
 ## 소개
 
@@ -45,35 +53,6 @@ PeachLeaf는 스티커 노트의 단순함과 마크다운의 강력함을 결�
 - `⌘V` - 클립보드에서 이미지 붙여넣기
 - `⌘Z` / `⌘⇧Z` - 실행 취소 / 다시 실행
 - `Delete` / `Backspace` - 선택한 이미지 삭제
-
-## 설치
-
-### 다운로드
-[Releases](https://github.com/yourusername/peach-leaf/releases) 페이지에서 최신 버전을 다운로드하세요.
-
-### 소스에서 빌드
-
-**필수 요구사항:**
-- Node.js 18+ 및 npm
-- Rust 1.70+
-- Xcode Command Line Tools (macOS)
-
-**설치 및 실행:**
-
-```bash
-# 저장소 클론
-git clone https://github.com/yourusername/peach-leaf.git
-cd peach-leaf
-
-# 의존성 설치
-npm install
-
-# 개발 모드 실행
-npm run dev
-
-# 프로덕션 빌드
-npm run build
-```
 
 ## 사용법
 
@@ -148,27 +127,6 @@ npm run build
 더 많은 텍스트.
 ```
 
-## 소스에서 빌드하기
-
-### 개발
-
-```bash
-# 핫 리로드로 실행
-npm run dev
-
-# 프론트엔드만 빌드
-npm run build:renderer
-```
-
-### 프로덕션 빌드
-
-```bash
-# 완전한 애플리케이션 빌드
-npm run build
-
-# 출력은 src-tauri/target/release/bundle/에 있습니다
-```
-
 ## 문제 해결
 
 ### 실행 시 노트가 복원되지 않음
@@ -197,7 +155,7 @@ npm run build
 
 기여를 환영합니다! Pull Request를 자유롭게 제출해 주세요.
 
-1. 저장소 포크
+1. [저장소](https://github.com/hada0127/peach-leaf) 포크
 2. 기능 브랜치 생성 (`git checkout -b feature/amazing-feature`)
 3. 변경사항 커밋 (`git commit -m 'Add some amazing feature'`)
 4. 브랜치에 푸시 (`git push origin feature/amazing-feature`)
@@ -215,7 +173,7 @@ npm run build
 
 ## 지원
 
-문제가 발생하거나 질문이 있으시면 [이슈를 열어주세요](https://github.com/yourusername/peach-leaf/issues).
+문제가 발생하거나 질문이 있으시면 [이슈를 열어주세요](https://github.com/hada0127/peach-leaf/issues).
 
 ---
 

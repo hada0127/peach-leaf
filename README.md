@@ -1,9 +1,17 @@
 # PeachLeaf
 
-A beautiful, lightweight markdown sticky notes application for macOS.
+<p align="center">
+  <img src="app-icon.png" alt="PeachLeaf 로고" width="128" height="128">
+</p>
 
-![PeachLeaf](https://img.shields.io/badge/platform-macOS-lightgrey)
-![License](https://img.shields.io/badge/license-MIT-blue)
+<p align="center">
+  A beautiful, lightweight markdown sticky notes application for macOS.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/platform-macOS-lightgrey" alt="Platform">
+  <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
+</p>
 
 ## Overview
 
@@ -45,35 +53,6 @@ PeachLeaf is a native macOS application that brings the simplicity of sticky not
 - `⌘V` - Paste image from clipboard
 - `⌘Z` / `⌘⇧Z` - Undo / Redo
 - `Delete` / `Backspace` - Delete selected image
-
-## Installation
-
-### Download
-Download the latest release from the [Releases](https://github.com/yourusername/peach-leaf/releases) page.
-
-### From Source
-
-**Prerequisites:**
-- Node.js 18+ and npm
-- Rust 1.70+
-- Xcode Command Line Tools (macOS)
-
-**Install and Run:**
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/peach-leaf.git
-cd peach-leaf
-
-# Install dependencies
-npm install
-
-# Run in development mode
-npm run dev
-
-# Build for production
-npm run build
-```
 
 ## Usage
 
@@ -148,27 +127,6 @@ Some text here.
 More text.
 ```
 
-## Building from Source
-
-### Development
-
-```bash
-# Run with hot reload
-npm run dev
-
-# Build frontend only
-npm run build:renderer
-```
-
-### Production Build
-
-```bash
-# Build the complete application
-npm run build
-
-# The output will be in src-tauri/target/release/bundle/
-```
-
 ## Troubleshooting
 
 ### Notes Don't Restore on Launch
@@ -197,7 +155,7 @@ npm run build
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-1. Fork the repository
+1. Fork the [repository](https://github.com/hada0127/peach-leaf)
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit your changes (`git commit -m 'Add some amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
@@ -215,7 +173,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Support
 
-If you encounter any issues or have questions, please [open an issue](https://github.com/yourusername/peach-leaf/issues).
+If you encounter any issues or have questions, please [open an issue](https://github.com/hada0127/peach-leaf/issues).
 
 ---
 
