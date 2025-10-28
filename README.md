@@ -58,24 +58,25 @@ PeachLeaf is a native macOS application that brings the simplicity of sticky not
 
 ### macOS Security Notice
 
-When you first download and open PeachLeaf, macOS may display a security warning saying the app is "damaged" or from an "unidentified developer". This is normal for apps distributed outside the Mac App Store.
+When you first download and open PeachLeaf, macOS may display a security warning saying the app is from an "unidentified developer". This is normal for apps distributed outside the Mac App Store.
 
-**To resolve this:**
+**To open PeachLeaf:**
 
-**Method 1: Remove quarantine attribute (Recommended)**
-```bash
-xattr -cr /path/to/PeachLeaf.app
-```
-
-**Method 2: Right-click method**
+**Method 1: Right-click to open (Recommended)**
 1. Right-click (or Control-click) on PeachLeaf.app
 2. Select "Open" from the menu
 3. Click "Open" in the dialog that appears
 
-**Method 3: System Settings**
-1. Go to System Settings → Privacy & Security
-2. Scroll down to find "PeachLeaf was blocked"
-3. Click "Open Anyway"
+**Method 2: System Settings**
+1. Try to open PeachLeaf normally (it will be blocked)
+2. Go to System Settings → Privacy & Security
+3. Scroll down to find "PeachLeaf was blocked"
+4. Click "Open Anyway"
+
+**Method 3: Remove quarantine attribute**
+```bash
+xattr -cr /path/to/PeachLeaf.app
+```
 
 After using any of these methods once, PeachLeaf will open normally in the future.
 

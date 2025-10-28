@@ -13,25 +13,47 @@ pub async fn open_color_picker(
     let parent_window = app.get_webview_window(&parent_label)
         .ok_or("Parent window not found")?;
 
+    // Get parent window's monitor and position
+    let monitor = parent_window.current_monitor()
+        .map_err(|e| format!("Failed to get monitor: {}", e))?
+        .ok_or("No monitor found")?;
+
+    let parent_position = parent_window.outer_position()
+        .map_err(|e| format!("Failed to get parent position: {}", e))?;
+
+    let monitor_position = monitor.position();
+    let monitor_size = monitor.size();
+
+    println!("Color picker - Parent window on monitor: name={:?}, position=({}, {}), size={}x{}",
+        monitor.name(),
+        monitor_position.x,
+        monitor_position.y,
+        monitor_size.width,
+        monitor_size.height
+    );
+
     // Calculate position below the Color menu
     // On macOS, the global menu bar is at the top of the screen
     // The Color menu is approximately at position: PeachLeaf(~60px) + File(~40px) + Edit(~40px) + Font(~40px) + Color(starts ~180px)
-    // Y position should be just below the menu bar (macOS menu bar is ~25px tall)
-
-    // Get screen size to ensure window is fully visible
-    let monitor = parent_window.current_monitor().ok().flatten();
-    let screen_width = monitor.map(|m| m.size().width).unwrap_or(1920);
-
-    // Calculate X position for Color menu, ensuring it doesn't go off screen
     let picker_width = 252;
-    let menu_x = 180; // Approximate Color menu position
-    let x = if menu_x + picker_width > screen_width as i32 {
-        (screen_width as i32 - picker_width - 10).max(10) // Keep 10px margin
+    let picker_height = 108;
+    let menu_x_offset = 180; // Approximate Color menu position relative to screen left
+    let menu_bar_height = 25; // macOS menu bar height
+
+    // Calculate X position: use monitor's left edge + menu offset
+    let x = monitor_position.x + menu_x_offset;
+
+    // Ensure picker doesn't go off screen (right edge)
+    let x = if x + picker_width > monitor_position.x + monitor_size.width as i32 {
+        (monitor_position.x + monitor_size.width as i32 - picker_width - 10).max(monitor_position.x + 10)
     } else {
-        menu_x
+        x
     };
 
-    let y = 25; // Just below macOS menu bar (global menu bar height)
+    // Y position: just below the menu bar on the parent window's monitor
+    let y = monitor_position.y + menu_bar_height;
+
+    println!("Color picker will be positioned at: ({}, {})", x, y);
 
     // Close existing color picker if any
     if let Some(existing) = app.get_webview_window("color-picker") {

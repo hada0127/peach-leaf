@@ -5,8 +5,9 @@
   "scripts": {
     "dev": "tauri dev",
     "dev:renderer": "vite",
-    "build": "tauri build",
+    "build": "tauri build && npm run sign",
     "build:renderer": "vite build",
+    "sign": "codesign --force --deep --sign - src-tauri/target/release/bundle/macos/PeachLeaf.app && echo 'Ad-hoc signature applied successfully'",
     "tauri": "tauri"
   },
   "keywords": [
