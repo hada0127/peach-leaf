@@ -58,19 +58,19 @@
       container.style.position = 'relative';
       container.style.display = 'inline-block';
       container.style.margin = '8px 0';
-      container.style.maxWidth = '100%';
 
       const img = document.createElement('img');
       img.src = this.src;
       img.alt = this.alt;
       img.style.display = 'block';
       img.style.borderRadius = '4px';
-      img.style.maxWidth = '100%';
       img.style.height = 'auto';
 
       if (this.width) {
+        // 설정한 사이즈가 있으면 그 크기로
         img.style.width = `${this.width}px`;
       }
+      // width가 없으면 원본 크기로 (max-width 없음)
 
       // Click to select
       container.addEventListener('click', (e) => {
@@ -724,6 +724,8 @@
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
             color: textColor,
             lineHeight: '1.6',
+            paddingLeft: '16px',
+            paddingRight: '16px',
           },
           '.cm-line': {
             lineHeight: '1.6 !important',
@@ -817,7 +819,6 @@
     position: relative;
     display: inline-block;
     margin: 8px 0;
-    max-width: 100%;
     vertical-align: middle;
   }
 
@@ -839,7 +840,6 @@
   :global(.cm-image-container img) {
     display: block;
     border-radius: 4px;
-    max-width: 100%;
     height: auto;
   }
 
