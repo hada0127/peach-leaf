@@ -516,6 +516,32 @@
               return true;
             }
 
+            // Handle Backspace when cursor is right after an image
+            if (event.key === 'Backspace' && !selectedImagePosition) {
+              const cursor = view.state.selection.main.head;
+              const text = view.state.doc.toString();
+
+              // Check if cursor is right after an image markdown (including optional width comment)
+              const imageRegex = /!\[([^\]]*)\]\((\.\/[^)]+)\)(?:<!--\s*width:(\d+)\s*-->)?$/;
+              const textBeforeCursor = text.substring(0, cursor);
+              const match = textBeforeCursor.match(imageRegex);
+
+              if (match) {
+                event.preventDefault();
+                const imageLength = match[0].length;
+                const from = cursor - imageLength;
+                const to = cursor;
+
+                console.log('[MarkdownEditor] Deleting image at cursor:', from, to);
+
+                view.dispatch({
+                  changes: { from, to, insert: '' }
+                });
+
+                return true;
+              }
+            }
+
             // Detect Cmd+V or Ctrl+V
             if ((event.metaKey || event.ctrlKey) && event.key === 'v') {
               event.preventDefault(); // Prevent default paste
