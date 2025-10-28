@@ -37,7 +37,7 @@ pub fn create_menu(app: &tauri::App) -> Result<Menu<tauri::Wry>, tauri::Error> {
         .separator()
         .item(&MenuItemBuilder::new("Cut").id("cut").accelerator("CmdOrCtrl+X").build(app)?)
         .item(&MenuItemBuilder::new("Copy").id("copy").accelerator("CmdOrCtrl+C").build(app)?)
-        .item(&MenuItemBuilder::new("Paste").id("paste").build(app)?)
+        .item(&MenuItemBuilder::new("Paste").id("paste").accelerator("CmdOrCtrl+V").build(app)?)
         .build()?;
 
     // Font Menu with check items (default is Medium - 14px)
