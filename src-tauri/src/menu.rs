@@ -209,17 +209,19 @@ pub fn setup_menu_handler(app: &tauri::AppHandle) {
             update_font_menu_checks(font_size);
         }
 
-        // Emit event to the focused window (for other menu items)
+        // Emit event to the focused window (for other menu items) - use window-specific event
         if let Some(focused_window) = app.webview_windows().values().find(|w| {
             w.is_focused().unwrap_or(false)
         }) {
-            println!("Emitting to focused window: {}", focused_window.label());
-            let _ = focused_window.emit("menu", menu_id);
+            let window_label = focused_window.label();
+            let event_name = format!("menu_{}", window_label);
+            println!("Emitting to focused window: {} with event: {}", window_label, event_name);
+            let _ = focused_window.emit(&event_name, menu_id);
         } else {
             // Fallback to main window if no window is focused
             if let Some(window) = app.get_webview_window("main") {
                 println!("No focused window, emitting to main");
-                let _ = window.emit("menu", menu_id);
+                let _ = window.emit("menu_main", menu_id);
             }
         }
     });

@@ -488,11 +488,6 @@
     window.addEventListener('keydown', handleKeydown);
     window.addEventListener('keyup', handleKeyup);
 
-    // Tauri 메뉴 이벤트 리스닝
-    unlistenMenu = await listen('menu', (event) => {
-      handleMenuEvent(event.payload as string);
-    });
-
     // 윈도우 정보 가져오기
     const { getCurrentWindow } = await import('@tauri-apps/api/window');
     const currentWindow = getCurrentWindow();
@@ -500,6 +495,12 @@
 
     console.log(`[${data.id}] Window label: ${windowLabel}`);
     console.log(`[${data.id}] Initial data:`, data);
+
+    // Tauri 메뉴 이벤트 리스닝 - 윈도우별 이벤트 사용
+    unlistenMenu = await listen(`menu_${windowLabel}`, (event) => {
+      console.log(`[${data.id}] Menu event received:`, event.payload);
+      handleMenuEvent(event.payload as string);
+    });
 
     // Props로 받은 배경색 적용
     if (data.backgroundColor) {
