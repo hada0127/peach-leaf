@@ -5,7 +5,7 @@
   import { markdown } from '@codemirror/lang-markdown';
   import { defaultKeymap, history, historyKeymap, deleteCharBackward } from '@codemirror/commands';
   import { highlightActiveLineGutter, highlightSpecialChars, drawSelection, dropCursor, highlightActiveLine } from '@codemirror/view';
-  import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language';
+  import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, syntaxTree } from '@codemirror/language';
 
   interface Props {
     content: string;
@@ -237,6 +237,65 @@
     }
   }
 
+  // Create decorations for heading sizes
+  function createHeadingDecorations(view: EditorView): DecorationSet {
+    const decorations: Range<Decoration>[] = [];
+    const tree = syntaxTree(view.state);
+
+    tree.iterate({
+      enter: (node) => {
+        const nodeName = node.name;
+        let fontSize = '';
+
+        // Match heading levels - exact same as preview
+        if (nodeName === 'ATXHeading1' || nodeName === 'SetextHeading1') {
+          fontSize = '1.8em';
+        } else if (nodeName === 'ATXHeading2' || nodeName === 'SetextHeading2') {
+          fontSize = '1.5em';
+        } else if (nodeName === 'ATXHeading3') {
+          fontSize = '1.3em';
+        } else if (nodeName === 'ATXHeading4') {
+          fontSize = '1.1em';
+        } else if (nodeName === 'ATXHeading5') {
+          fontSize = '1.0em';
+        } else if (nodeName === 'ATXHeading6') {
+          fontSize = '0.9em';
+        }
+
+        if (fontSize) {
+          const deco = Decoration.line({
+            attributes: {
+              style: `font-size: ${fontSize};`
+            }
+          });
+          decorations.push(deco.range(node.from));
+        }
+      }
+    });
+
+    return Decoration.set(decorations);
+  }
+
+  // ViewPlugin to manage heading decorations
+  const headingPlugin = ViewPlugin.fromClass(
+    class {
+      decorations: DecorationSet;
+
+      constructor(view: EditorView) {
+        this.decorations = createHeadingDecorations(view);
+      }
+
+      update(update: ViewUpdate) {
+        if (update.docChanged || update.viewportChanged) {
+          this.decorations = createHeadingDecorations(update.view);
+        }
+      }
+    },
+    {
+      decorations: (v) => v.decorations,
+    }
+  );
+
   // Create decorations for images
   function createImageDecorations(view: EditorView): DecorationSet {
     const widgets: Range<Decoration>[] = [];
@@ -435,6 +494,7 @@
         keymap.of([...defaultKeymap, ...historyKeymap]),
         markdown(),
         EditorView.lineWrapping, // 자동 줄바꿈 활성화
+        headingPlugin, // Add heading size decorations
         imagePlugin, // Add image widget plugin
         imageAtomicRanges, // Make images deletable as single unit
         EditorView.domEventHandlers({
@@ -546,12 +606,13 @@
             outline: 'none',
           },
           '.cm-content': {
-            fontFamily: 'Monaco, Menlo, monospace',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
             color: textColor,
           },
           '.cm-scroller': {
             overflow: 'auto',
           },
+          // Remove borders from all markdown elements
           '.cm-line .ͼe': {
             borderBottom: 'none !important',
           },
@@ -569,6 +630,14 @@
           },
           '.cm-line .ͼj': {
             borderBottom: 'none !important',
+          },
+          // Ensure all markdown syntax elements have same font size as body text
+          '.cm-em, .cm-strong, .cm-strikethrough, .cm-link, .cm-code': {
+            fontSize: 'inherit !important',
+          },
+          // Ensure heading markers (#, ##, etc) don't affect size
+          '.cm-heading-mark': {
+            fontSize: 'inherit !important',
           },
         }),
       ],
@@ -678,7 +747,7 @@
     text-decoration: none !important;
   }
 
-  /* CodeMirror heading classes - remove underline */
+  /* Remove underline from all markdown heading classes */
   :global(.ͼ5),
   :global(.ͼ6),
   :global(.ͼ7),
@@ -687,7 +756,14 @@
   :global(.ͼa),
   :global(.ͼb),
   :global(.ͼc),
-  :global(.ͼd) {
+  :global(.ͼd),
+  :global(.ͼe) {
     text-decoration: none !important;
+  }
+
+  /* Normalize font sizes for inline elements only (bold, italic, code, etc.) */
+  /* Don't apply to heading lines which are controlled by headingPlugin */
+  :global(.cm-line:not([style*="font-size"]) span.ͼ9) {
+    font-size: inherit !important;
   }
 </style>
