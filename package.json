@@ -1,6 +1,6 @@
 {
   "name": "peach-leaf",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "macOS markdown sticky notes app built with Tauri",
   "scripts": {
     "dev": "tauri dev",
@@ -13,10 +13,12 @@
   "keywords": [
     "markdown",
     "sticky-notes",
+    "svelte",
     "tauri",
-    "macos"
+    "macos",
+    "hada0127"
   ],
-  "author": "",
+  "author": "hada0127",
   "license": "MIT",
   "type": "module",
   "devDependencies": {
