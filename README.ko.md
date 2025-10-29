@@ -58,9 +58,20 @@ PeachLeaf는 스티커 노트의 단순함과 마크다운의 강력함을 결�
 
 ### macOS 보안 안내
 
-PeachLeaf를 처음 다운로드하고 열 때, macOS에서 "신뢰할 수 없는 개발자"라는 보안 경고를 표시할 수 있습니다. 이는 Mac App Store 외부에서 배포되는 앱에서 나타나는 정상적인 현상입니다.
+PeachLeaf를 처음 다운로드하고 열 때, macOS에서 보안 경고를 표시할 수 있습니다. 이는 Mac App Store 외부에서 배포되는 앱에서 나타나는 정상적인 현상입니다.
 
-**PeachLeaf 열기:**
+**"손상되었습니다" 또는 "파일이 손상되어" 오류가 나타나는 경우:**
+
+DMG 파일 자체에 격리 속성이 있을 수 있습니다. 다음 명령어로 제거하세요:
+```bash
+# DMG에서 격리 속성 제거
+xattr -cr ~/Downloads/PeachLeaf_1.0.1_aarch64.dmg
+
+# DMG를 마운트하고 앱을 응용 프로그램으로 복사한 후:
+xattr -cr /Applications/PeachLeaf.app
+```
+
+**"신뢰할 수 없는 개발자" 경고가 나타나는 경우:**
 
 **방법 1: 우클릭으로 열기 (권장)**
 1. PeachLeaf.app을 우클릭 (또는 Control-클릭)
@@ -73,9 +84,9 @@ PeachLeaf를 처음 다운로드하고 열 때, macOS에서 "신뢰할 수 없�
 3. 아래로 스크롤하여 "PeachLeaf가 차단되었습니다" 찾기
 4. "확인 없이 열기" 클릭
 
-**방법 3: 격리 속성 제거**
+**방법 3: 터미널 명령어**
 ```bash
-xattr -cr /path/to/PeachLeaf.app
+xattr -cr /Applications/PeachLeaf.app
 ```
 
 이 방법 중 하나를 한 번 사용하면, 이후부터는 PeachLeaf가 정상적으로 열립니다.
