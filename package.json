@@ -1,6 +1,6 @@
 {
   "name": "peach-leaf",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "macOS markdown sticky notes app built with Tauri",
   "scripts": {
     "dev": "tauri dev",
