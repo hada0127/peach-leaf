@@ -300,6 +300,28 @@
     }
   }
 
+  // 프린트 기능
+  async function handlePrint() {
+    console.log('[Sticker] handlePrint called');
+
+    const previousMode = mode;
+
+    // 편집 모드인 경우 임시로 미리보기 모드로 전환
+    if (mode === 'edit') {
+      mode = 'preview';
+      // DOM 업데이트 대기
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    // 프린트 실행
+    window.print();
+
+    // 원래 모드로 복원
+    if (previousMode === 'edit') {
+      mode = previousMode;
+    }
+  }
+
   // 컬러 피커 열기
   async function openColorPicker() {
     console.log('openColorPicker called');
@@ -479,6 +501,7 @@
   let unlistenColorSelected: (() => void) | null = null;
   let unlistenCloseNote: (() => void) | null = null;
   let unlistenOpenColorPicker: (() => void) | null = null;
+  let unlistenPrint: (() => void) | null = null;
   let unlistenResized: (() => void) | null = null;
   let unlistenMoved: (() => void) | null = null;
 
@@ -548,6 +571,12 @@
       openColorPicker();
     });
 
+    // 프린트 이벤트 리스닝
+    unlistenPrint = await listen(`print_${data.id}`, () => {
+      console.log(`[${data.id}] Received print event for this window`);
+      handlePrint();
+    });
+
     // Listen for window resize events
     unlistenResized = await currentWindow.onResized(async () => {
       console.log(`[${data.id}] Window resized, saving state...`);
@@ -592,6 +621,7 @@
     if (unlistenColorSelected) unlistenColorSelected();
     if (unlistenCloseNote) unlistenCloseNote();
     if (unlistenOpenColorPicker) unlistenOpenColorPicker();
+    if (unlistenPrint) unlistenPrint();
     if (unlistenResized) unlistenResized();
     if (unlistenMoved) unlistenMoved();
   });

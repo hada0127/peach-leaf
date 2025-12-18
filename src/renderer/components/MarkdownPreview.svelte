@@ -226,4 +226,12 @@
     max-width: 100%;
     height: auto;
   }
+
+  /* 프린트 스타일 */
+  @media print {
+    .preview {
+      overflow: visible !important;
+      height: auto !important;
+    }
+  }
 </style>

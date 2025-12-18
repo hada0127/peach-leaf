@@ -28,6 +28,8 @@ pub fn create_menu(app: &tauri::App) -> Result<Menu<tauri::Wry>, tauri::Error> {
     let file_menu = SubmenuBuilder::new(app, "File")
         .item(&MenuItemBuilder::new("New Note").id("new_note").accelerator("CmdOrCtrl+N").build(app)?)
         .item(&MenuItemBuilder::new("Close Note").id("close_note").accelerator("CmdOrCtrl+W").build(app)?)
+        .separator()
+        .item(&MenuItemBuilder::new("Print...").id("print").accelerator("CmdOrCtrl+P").build(app)?)
         .build()?;
 
     // Edit Menu
@@ -191,6 +193,19 @@ pub fn setup_menu_handler(app: &tauri::AppHandle) {
 
                 // Emit window-specific event
                 let _ = focused_window.emit(&format!("open_color_picker_{}", window_label), ());
+            }
+            return;
+        }
+
+        // Handle print: emit to focused window only
+        if menu_id == "print" {
+            println!("Handling print in backend");
+            if let Some(focused_window) = app.webview_windows().values().find(|w| {
+                w.is_focused().unwrap_or(false)
+            }) {
+                let window_label = focused_window.label().to_string();
+                println!("Emitting print event to focused window: {}", window_label);
+                let _ = focused_window.emit(&format!("print_{}", window_label), ());
             }
             return;
         }

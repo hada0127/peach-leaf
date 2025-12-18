@@ -1,6 +1,6 @@
 {
   "name": "peach-leaf",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "macOS markdown sticky notes app built with Tauri",
   "scripts": {
     "dev": "tauri dev",
@@ -8,7 +8,8 @@
     "build": "tauri build && npm run sign",
     "build:renderer": "vite build",
     "sign": "codesign --force --deep --sign - src-tauri/target/release/bundle/macos/PeachLeaf.app && echo 'Ad-hoc signature applied successfully'",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "release": "node scripts/release.js"
   },
   "keywords": [
     "markdown",

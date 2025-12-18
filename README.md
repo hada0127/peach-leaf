@@ -62,13 +62,19 @@ When you first download and open PeachLeaf, macOS may display a security warning
 
 **If you see "damaged" or "corrupted" error:**
 
-The DMG file itself may have quarantine attributes. Remove them with:
-```bash
-# Remove quarantine from DMG
-xattr -cr ~/Downloads/PeachLeaf_1.0.1_aarch64.dmg
+This happens because the app is not notarized by Apple. Use this command to bypass Gatekeeper:
 
-# Mount DMG, copy app to Applications, then:
-xattr -cr /Applications/PeachLeaf.app
+```bash
+# After copying app to Applications folder:
+sudo xattr -rd com.apple.quarantine /Applications/PeachLeaf.app
+sudo codesign --force --deep --sign - /Applications/PeachLeaf.app
+```
+
+Or disable Gatekeeper temporarily (not recommended):
+```bash
+sudo spctl --master-disable
+# Open PeachLeaf.app once, then re-enable:
+sudo spctl --master-enable
 ```
 
 **If you see "unidentified developer" warning:**

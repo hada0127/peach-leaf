@@ -13,3 +13,43 @@ body {
 #app {
   height: 100%;
 }
+
+/* 프린트 스타일 */
+@media print {
+  /* 툴바 숨기기 */
+  .toolbar {
+    display: none !important;
+  }
+
+  /* 페이지 설정 */
+  @page {
+    margin: 1cm;
+  }
+
+  /* 스티커 컨테이너 조정 */
+  .sticker {
+    box-shadow: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* 콘텐츠 영역 조정 */
+  .content {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  /* 이미지 페이지 넘김 방지 */
+  img {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* 코드 블록 페이지 넘김 방지 */
+  pre, code {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

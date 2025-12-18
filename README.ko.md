@@ -62,13 +62,19 @@ PeachLeaf를 처음 다운로드하고 열 때, macOS에서 보안 경고를 표
 
 **"손상되었습니다" 또는 "파일이 손상되어" 오류가 나타나는 경우:**
 
-DMG 파일 자체에 격리 속성이 있을 수 있습니다. 다음 명령어로 제거하세요:
-```bash
-# DMG에서 격리 속성 제거
-xattr -cr ~/Downloads/PeachLeaf_1.0.1_aarch64.dmg
+이는 앱이 Apple에 의해 공증(notarization)되지 않았기 때문입니다. 다음 명령어로 Gatekeeper를 우회하세요:
 
-# DMG를 마운트하고 앱을 응용 프로그램으로 복사한 후:
-xattr -cr /Applications/PeachLeaf.app
+```bash
+# 앱을 응용 프로그램 폴더로 복사한 후:
+sudo xattr -rd com.apple.quarantine /Applications/PeachLeaf.app
+sudo codesign --force --deep --sign - /Applications/PeachLeaf.app
+```
+
+또는 Gatekeeper를 일시적으로 비활성화 (권장하지 않음):
+```bash
+sudo spctl --master-disable
+# PeachLeaf.app을 한 번 실행한 후 다시 활성화:
+sudo spctl --master-enable
 ```
 
 **"신뢰할 수 없는 개발자" 경고가 나타나는 경우:**
