@@ -304,21 +304,15 @@
   async function handlePrint() {
     console.log('[Sticker] handlePrint called');
 
-    const previousMode = mode;
-
-    // 편집 모드인 경우 임시로 미리보기 모드로 전환
-    if (mode === 'edit') {
-      mode = 'preview';
-      // DOM 업데이트 대기
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-
-    // 프린트 실행
-    window.print();
-
-    // 원래 모드로 복원
-    if (previousMode === 'edit') {
-      mode = previousMode;
+    try {
+      // Tauri webview print API 사용
+      const { getCurrentWebview } = await import('@tauri-apps/api/webview');
+      const webview = getCurrentWebview();
+      await webview.print();
+    } catch (error) {
+      console.error('[Sticker] Print failed:', error);
+      // fallback to window.print()
+      window.print();
     }
   }
 
@@ -655,6 +649,11 @@
       {/if}
     {/key}
   </div>
+
+  <!-- 프린트 전용 preview (항상 렌더링, 화면에서는 숨김) -->
+  <div class="print-only" style="font-size: {fontSize}px; color: {textColor};">
+    <MarkdownPreview {content} {textColor} {fontSize} filePath={data.filePath} />
+  </div>
 </div>
 
 <style>
@@ -671,5 +670,21 @@
     flex: 1;
     overflow: auto;
     padding: 12px;
+  }
+
+  /* 프린트 전용 영역: 화면에서는 숨김 */
+  .print-only {
+    display: none;
+  }
+
+  @media print {
+    .print-only {
+      display: block;
+      padding: 12px;
+    }
+
+    .content {
+      display: none !important;
+    }
   }
 </style>

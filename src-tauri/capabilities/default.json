@@ -17,6 +17,7 @@
     "clipboard-manager:allow-write-text",
     "dialog:allow-ask",
     "dialog:allow-confirm",
-    "dialog:allow-message"
+    "dialog:allow-message",
+    "core:webview:allow-print"
   ]
 }
