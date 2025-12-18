@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "PeachLeaf",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "identifier": "com.peachleaf.app",
   "build": {
     "frontendDist": "../dist/renderer",
@@ -19,7 +19,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["dmg", "app"],
+    "targets": [
+      "dmg",
+      "app"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
