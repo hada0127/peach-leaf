@@ -266,38 +266,23 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    // 키를 누르고 있는 동안 중복 실행 방지
-    const keyCombo = `${e.metaKey || e.ctrlKey ? 'cmd-' : ''}${e.key.toLowerCase()}`;
-
-    // 이미 눌려있는 키면 무시 (키 반복 방지)
-    if (pressedKeys.has(keyCombo)) {
-      e.preventDefault();
-      return;
-    }
-
-    pressedKeys.add(keyCombo);
-
-    // Cmd+M: 모드 전환 - 이것만 preventDefault
+    // Cmd+M: 모드 전환
     if ((e.metaKey || e.ctrlKey) && e.key === 'm') {
       e.preventDefault();
+      if (!e.repeat) {
+        toggleMode();
+      }
     }
-    // Cmd+N, Cmd+W, Cmd+Q는 메뉴 시스템이 처리하도록 그냥 통과
     // 다른 모든 키는 기본 동작 허용 (CodeMirror가 처리)
   }
 
   function handleKeyup(e: KeyboardEvent) {
-    const keyCombo = `${e.metaKey || e.ctrlKey ? 'cmd-' : ''}${e.key.toLowerCase()}`;
+    // 현재는 keyup에서 처리할 것 없음
+  }
 
-    // 키를 뗐을 때 실행
-    if (pressedKeys.has(keyCombo)) {
-      pressedKeys.delete(keyCombo);
-
-      // Cmd+M: 모드 전환
-      if ((e.metaKey || e.ctrlKey) && e.key === 'm') {
-        e.preventDefault();
-        toggleMode();
-      }
-    }
+  // 윈도우 포커스 잃을 때 키 상태 초기화
+  function handleWindowBlur() {
+    pressedKeys.clear();
   }
 
   // 프린트 기능
@@ -504,6 +489,7 @@
     console.log('[Sticker] onMount - data.filePath:', data.filePath);
     window.addEventListener('keydown', handleKeydown);
     window.addEventListener('keyup', handleKeyup);
+    window.addEventListener('blur', handleWindowBlur);
 
     // 윈도우 정보 가져오기
     const { getCurrentWindow } = await import('@tauri-apps/api/window');
@@ -611,6 +597,7 @@
   onDestroy(() => {
     window.removeEventListener('keydown', handleKeydown);
     window.removeEventListener('keyup', handleKeyup);
+    window.removeEventListener('blur', handleWindowBlur);
     if (unlistenMenu) unlistenMenu();
     if (unlistenColorSelected) unlistenColorSelected();
     if (unlistenCloseNote) unlistenCloseNote();
