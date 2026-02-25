@@ -29,6 +29,8 @@ pub fn create_menu(app: &tauri::App) -> Result<Menu<tauri::Wry>, tauri::Error> {
         .item(&MenuItemBuilder::new("New Note").id("new_note").accelerator("CmdOrCtrl+N").build(app)?)
         .item(&MenuItemBuilder::new("Close Note").id("close_note").accelerator("CmdOrCtrl+W").build(app)?)
         .separator()
+        .item(&MenuItemBuilder::new("Save As...").id("save_as").accelerator("CmdOrCtrl+S").build(app)?)
+        .separator()
         .item(&MenuItemBuilder::new("Print...").id("print").accelerator("CmdOrCtrl+P").build(app)?)
         .build()?;
 
@@ -193,6 +195,19 @@ pub fn setup_menu_handler(app: &tauri::AppHandle) {
 
                 // Emit window-specific event
                 let _ = focused_window.emit(&format!("open_color_picker_{}", window_label), ());
+            }
+            return;
+        }
+
+        // Handle save_as: emit to focused window only
+        if menu_id == "save_as" {
+            println!("Handling save_as in backend");
+            if let Some(focused_window) = app.webview_windows().values().find(|w| {
+                w.is_focused().unwrap_or(false)
+            }) {
+                let window_label = focused_window.label().to_string();
+                println!("Emitting save_as event to focused window: {}", window_label);
+                let _ = focused_window.emit(&format!("save_as_{}", window_label), ());
             }
             return;
         }

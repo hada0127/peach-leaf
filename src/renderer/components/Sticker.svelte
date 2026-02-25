@@ -317,6 +317,29 @@
     }
   }
 
+  // 다른 이름으로 저장
+  async function handleSaveAs() {
+    console.log('[Sticker] handleSaveAs called');
+    try {
+      const { save } = await import('@tauri-apps/plugin-dialog');
+      const filePath = await save({
+        filters: [{
+          name: 'Markdown',
+          extensions: ['md']
+        }],
+        defaultPath: `${data.id}.md`
+      });
+
+      if (filePath) {
+        const { invoke } = await import('@tauri-apps/api/core');
+        await invoke('write_file', { filePath, content });
+        console.log('[Sticker] File saved to:', filePath);
+      }
+    } catch (error) {
+      console.error('[Sticker] Save As failed:', error);
+    }
+  }
+
   // 컬러 피커 열기
   async function openColorPicker() {
     console.log('openColorPicker called');
@@ -497,6 +520,7 @@
   let unlistenCloseNote: (() => void) | null = null;
   let unlistenOpenColorPicker: (() => void) | null = null;
   let unlistenPrint: (() => void) | null = null;
+  let unlistenSaveAs: (() => void) | null = null;
   let unlistenResized: (() => void) | null = null;
   let unlistenMoved: (() => void) | null = null;
 
@@ -573,6 +597,12 @@
       handlePrint();
     });
 
+    // 다른 이름으로 저장 이벤트 리스닝
+    unlistenSaveAs = await listen(`save_as_${data.id}`, () => {
+      console.log(`[${data.id}] Received save_as event for this window`);
+      handleSaveAs();
+    });
+
     // Listen for window resize events
     unlistenResized = await currentWindow.onResized(async () => {
       console.log(`[${data.id}] Window resized, saving state...`);
@@ -619,6 +649,7 @@
     if (unlistenCloseNote) unlistenCloseNote();
     if (unlistenOpenColorPicker) unlistenOpenColorPicker();
     if (unlistenPrint) unlistenPrint();
+    if (unlistenSaveAs) unlistenSaveAs();
     if (unlistenResized) unlistenResized();
     if (unlistenMoved) unlistenMoved();
   });

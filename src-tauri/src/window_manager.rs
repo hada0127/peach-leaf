@@ -190,21 +190,6 @@ pub fn restore_window(app: &tauri::AppHandle, sticker_data: StickerData) {
 }
 
 pub fn open_external_file(app: &tauri::AppHandle, file_path: &str) {
-    // Check if this file is already open
-    let windows = app.webview_windows();
-    let metadata = WINDOW_METADATA.lock().unwrap();
-    for (_, data) in metadata.iter() {
-        if data.file_path == file_path {
-            // Already open - focus the existing window
-            if let Some(window) = windows.get(&data.id) {
-                let _ = window.set_focus();
-                println!("File already open in window {}, focusing", data.id);
-                return;
-            }
-        }
-    }
-    drop(metadata);
-
     // Generate unique ID
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -212,13 +197,38 @@ pub fn open_external_file(app: &tauri::AppHandle, file_path: &str) {
         .as_millis();
     let new_id = format!("note-{}", timestamp);
 
+    // Copy external file content to internal storage
+    let content = match fs::read_to_string(file_path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Failed to read external file {}: {}", file_path, e);
+            return;
+        }
+    };
+
+    let notes_dir = match ensure_notes_dir() {
+        Ok(dir) => dir,
+        Err(e) => {
+            eprintln!("Failed to create notes directory: {}", e);
+            return;
+        }
+    };
+    let internal_path = notes_dir.join(format!("{}.md", new_id));
+    let internal_path_str = internal_path.to_string_lossy().to_string();
+
+    if let Err(e) = fs::write(&internal_path, &content) {
+        eprintln!("Failed to write internal copy: {}", e);
+        return;
+    }
+    println!("Copied external file to internal: {} -> {}", file_path, internal_path_str);
+
     // Random offset for window position
     let random_offset = (timestamp % 100) as i32 + 50;
 
-    // Create sticker data with the external file path
+    // Create sticker data with internal file path
     let sticker_data = StickerData {
         id: new_id.clone(),
-        file_path: file_path.to_string(),
+        file_path: internal_path_str,
         x: 150 + random_offset,
         y: 150 + random_offset,
         width: 400,
@@ -257,7 +267,7 @@ pub fn open_external_file(app: &tauri::AppHandle, file_path: &str) {
             if let Err(e) = save_window_state_impl(app) {
                 eprintln!("Failed to save window state after opening external file: {}", e);
             }
-            println!("Opened external file as new note: {}", file_path);
+            println!("Opened external file as new note (copied internally): {}", file_path);
         }
         Err(e) => {
             eprintln!("Failed to create window for external file: {}", e);
