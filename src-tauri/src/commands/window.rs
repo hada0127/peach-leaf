@@ -187,10 +187,15 @@ pub fn save_window_state_impl(app: &tauri::AppHandle) -> Result<(), String> {
             _ => (None, None, None)
         };
 
-        // Create file path for this window using permanent directory
-        let notes_dir = get_notes_dir();
-        let file_path = notes_dir.join(format!("{}.md", label));
-        let file_path_str = file_path.to_string_lossy().to_string();
+        // Use file_path from metadata if available (preserves external file paths),
+        // otherwise construct from notes directory
+        let file_path_str = metadata
+            .get(label.as_str())
+            .map(|data| data.file_path.clone())
+            .unwrap_or_else(|| {
+                let notes_dir = get_notes_dir();
+                notes_dir.join(format!("{}.md", label)).to_string_lossy().to_string()
+            });
 
         // Debug: check if metadata exists for this window
         if metadata.contains_key(label.as_str()) {

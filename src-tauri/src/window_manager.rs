@@ -232,6 +232,12 @@ pub fn open_external_file(app: &tauri::AppHandle, file_path: &str) {
         monitor_size: None,
     };
 
+    // Store metadata before creating window
+    {
+        let mut metadata = WINDOW_METADATA.lock().unwrap();
+        metadata.insert(new_id.clone(), sticker_data.clone());
+    }
+
     // Create window
     match WebviewWindowBuilder::new(
         app,
