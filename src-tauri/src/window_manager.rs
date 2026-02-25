@@ -189,6 +189,76 @@ pub fn restore_window(app: &tauri::AppHandle, sticker_data: StickerData) {
     }
 }
 
+pub fn open_external_file(app: &tauri::AppHandle, file_path: &str) {
+    // Check if this file is already open
+    let windows = app.webview_windows();
+    let metadata = WINDOW_METADATA.lock().unwrap();
+    for (_, data) in metadata.iter() {
+        if data.file_path == file_path {
+            // Already open - focus the existing window
+            if let Some(window) = windows.get(&data.id) {
+                let _ = window.set_focus();
+                println!("File already open in window {}, focusing", data.id);
+                return;
+            }
+        }
+    }
+    drop(metadata);
+
+    // Generate unique ID
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis();
+    let new_id = format!("note-{}", timestamp);
+
+    // Random offset for window position
+    let random_offset = (timestamp % 100) as i32 + 50;
+
+    // Create sticker data with the external file path
+    let sticker_data = StickerData {
+        id: new_id.clone(),
+        file_path: file_path.to_string(),
+        x: 150 + random_offset,
+        y: 150 + random_offset,
+        width: 400,
+        height: 300,
+        background_color: "#FFFBEB".to_string(),
+        text_color: "#333333".to_string(),
+        mode: "edit".to_string(),
+        font_size: 12,
+        monitor_name: None,
+        monitor_position: None,
+        monitor_size: None,
+    };
+
+    // Create window
+    match WebviewWindowBuilder::new(
+        app,
+        &new_id,
+        WebviewUrl::default(),
+    )
+    .title("PeachLeaf")
+    .inner_size(400.0, 300.0)
+    .position((150 + random_offset) as f64, (150 + random_offset) as f64)
+    .decorations(false)
+    .resizable(true)
+    .build() {
+        Ok(window) => {
+            if let Err(e) = window.emit("init-sticker", sticker_data) {
+                eprintln!("Failed to emit init-sticker: {}", e);
+            }
+            if let Err(e) = save_window_state_impl(app) {
+                eprintln!("Failed to save window state after opening external file: {}", e);
+            }
+            println!("Opened external file as new note: {}", file_path);
+        }
+        Err(e) => {
+            eprintln!("Failed to create window for external file: {}", e);
+        }
+    }
+}
+
 pub fn create_new_note_backend(app: &tauri::AppHandle) {
     // If no windows exist, create main window
     if app.webview_windows().is_empty() {

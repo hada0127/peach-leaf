@@ -82,6 +82,20 @@ pub fn run() {
                 RunEvent::ExitRequested { api, .. } => {
                     api.prevent_exit();
                 }
+                // Handle files opened from Finder
+                RunEvent::Opened { urls } => {
+                    for url in urls {
+                        if let Ok(path) = url.to_file_path() {
+                            if let Some(ext) = path.extension() {
+                                if ext == "md" || ext == "markdown" {
+                                    let file_path = path.to_string_lossy().to_string();
+                                    println!("Opening file from Finder: {}", file_path);
+                                    window_manager::open_external_file(app_handle, &file_path);
+                                }
+                            }
+                        }
+                    }
+                }
                 // Save state when a window is destroyed
                 RunEvent::WindowEvent { label, event: window_event, .. } => {
                     if let tauri::WindowEvent::Destroyed = window_event {

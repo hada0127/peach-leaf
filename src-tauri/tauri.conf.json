@@ -33,6 +33,14 @@
       "minimumSystemVersion": "10.13",
       "signingIdentity": null,
       "entitlements": null
-    }
+    },
+    "fileAssociations": [
+      {
+        "ext": ["md", "markdown"],
+        "mimeType": "text/markdown",
+        "role": "Editor",
+        "description": "Markdown Document"
+      }
+    ]
   }
 }

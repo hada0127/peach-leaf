@@ -194,10 +194,26 @@
     // Color is now handled by update_window_metadata and color-selected events
   }
 
+  function isExternalFile(): boolean {
+    // External files are not stored in ~/.peach-leaf/notes/
+    return !data.filePath.includes('/.peach-leaf/notes/');
+  }
+
   async function handleClose() {
     try {
       console.log(`[${data.id}] handleClose called`);
       console.log(`[${data.id}] raw content:`, JSON.stringify(content));
+
+      const isExternal = isExternalFile();
+
+      if (isExternal) {
+        // External file: just close the window, don't delete the file
+        console.log(`[${data.id}] External file, closing without delete`);
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        const currentWindow = getCurrentWindow();
+        await currentWindow.close();
+        return;
+      }
 
       // Check if there's content in the note
       const trimmedContent = content.trim();
